@@ -1,134 +1,134 @@
 ﻿  model.cpp
-C:\Users\Home\Desktop\bigboss.cg\openglathome\model.cpp(85,53): warning C4244: аргумент: преобразование "t" в "t", возможна потеря данных
-C:\Users\Home\Desktop\bigboss.cg\openglathome\model.cpp(85,53): warning C4244:         with
-C:\Users\Home\Desktop\bigboss.cg\openglathome\model.cpp(85,53): warning C4244:         [
-C:\Users\Home\Desktop\bigboss.cg\openglathome\model.cpp(85,53): warning C4244:             t=float
-C:\Users\Home\Desktop\bigboss.cg\openglathome\model.cpp(85,53): warning C4244:         ]
-C:\Users\Home\Desktop\bigboss.cg\openglathome\model.cpp(85,53): warning C4244:         and
-C:\Users\Home\Desktop\bigboss.cg\openglathome\model.cpp(85,53): warning C4244:         [
-C:\Users\Home\Desktop\bigboss.cg\openglathome\model.cpp(85,53): warning C4244:             t=int
-C:\Users\Home\Desktop\bigboss.cg\openglathome\model.cpp(85,53): warning C4244:         ]
-C:\Users\Home\Desktop\bigboss.cg\openglathome\model.cpp(85,20): warning C4244: аргумент: преобразование "t" в "t", возможна потеря данных
-C:\Users\Home\Desktop\bigboss.cg\openglathome\model.cpp(85,20): warning C4244:         with
-C:\Users\Home\Desktop\bigboss.cg\openglathome\model.cpp(85,20): warning C4244:         [
-C:\Users\Home\Desktop\bigboss.cg\openglathome\model.cpp(85,20): warning C4244:             t=float
-C:\Users\Home\Desktop\bigboss.cg\openglathome\model.cpp(85,20): warning C4244:         ]
-C:\Users\Home\Desktop\bigboss.cg\openglathome\model.cpp(85,20): warning C4244:         and
-C:\Users\Home\Desktop\bigboss.cg\openglathome\model.cpp(85,20): warning C4244:         [
-C:\Users\Home\Desktop\bigboss.cg\openglathome\model.cpp(85,20): warning C4244:             t=int
-C:\Users\Home\Desktop\bigboss.cg\openglathome\model.cpp(85,20): warning C4244:         ]
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\model.cpp(142,53): warning C4244: аргумент: преобразование "t" в "t", возможна потеря данных
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\model.cpp(142,53): warning C4244:         with
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\model.cpp(142,53): warning C4244:         [
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\model.cpp(142,53): warning C4244:             t=float
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\model.cpp(142,53): warning C4244:         ]
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\model.cpp(142,53): warning C4244:         and
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\model.cpp(142,53): warning C4244:         [
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\model.cpp(142,53): warning C4244:             t=int
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\model.cpp(142,53): warning C4244:         ]
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\model.cpp(142,20): warning C4244: аргумент: преобразование "t" в "t", возможна потеря данных
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\model.cpp(142,20): warning C4244:         with
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\model.cpp(142,20): warning C4244:         [
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\model.cpp(142,20): warning C4244:             t=float
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\model.cpp(142,20): warning C4244:         ]
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\model.cpp(142,20): warning C4244:         and
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\model.cpp(142,20): warning C4244:         [
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\model.cpp(142,20): warning C4244:             t=int
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\model.cpp(142,20): warning C4244:         ]
   openglathome.cpp
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(59,23): warning C4244: =: преобразование "t" в "t", возможна потеря данных
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(59,23): warning C4244:         with
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(59,23): warning C4244:         [
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(59,23): warning C4244:             t=int
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(59,23): warning C4244:         ]
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(59,23): warning C4244:         and
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(59,23): warning C4244:         [
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(59,23): warning C4244:             t=float
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(59,23): warning C4244:         ]
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(60,27): warning C4244: =: преобразование "t" в "t", возможна потеря данных
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(60,27): warning C4244:         with
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(60,27): warning C4244:         [
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(60,27): warning C4244:             t=int
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(60,27): warning C4244:         ]
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(60,27): warning C4244:         and
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(60,27): warning C4244:         [
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(60,27): warning C4244:             t=float
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(60,27): warning C4244:         ]
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(62,64): warning C4244: аргумент: преобразование "t" в "t", возможна потеря данных
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(62,64): warning C4244:         with
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(62,64): warning C4244:         [
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(62,64): warning C4244:             t=int
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(62,64): warning C4244:         ]
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(62,64): warning C4244:         and
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(62,64): warning C4244:         [
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(62,64): warning C4244:             t=float
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(62,64): warning C4244:         ]
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(62,49): warning C4244: аргумент: преобразование "t" в "t", возможна потеря данных
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(62,49): warning C4244:         with
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(62,49): warning C4244:         [
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(62,49): warning C4244:             t=int
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(62,49): warning C4244:         ]
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(62,49): warning C4244:         and
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(62,49): warning C4244:         [
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(62,49): warning C4244:             t=float
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(62,49): warning C4244:         ]
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(62,34): warning C4244: аргумент: преобразование "t" в "t", возможна потеря данных
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(62,34): warning C4244:         with
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(62,34): warning C4244:         [
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(62,34): warning C4244:             t=int
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(62,34): warning C4244:         ]
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(62,34): warning C4244:         and
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(62,34): warning C4244:         [
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(62,34): warning C4244:             t=float
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(62,34): warning C4244:         ]
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(63,64): warning C4244: аргумент: преобразование "t" в "t", возможна потеря данных
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(63,64): warning C4244:         with
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(63,64): warning C4244:         [
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(63,64): warning C4244:             t=int
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(63,64): warning C4244:         ]
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(63,64): warning C4244:         and
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(63,64): warning C4244:         [
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(63,64): warning C4244:             t=float
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(63,64): warning C4244:         ]
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(63,49): warning C4244: аргумент: преобразование "t" в "t", возможна потеря данных
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(63,49): warning C4244:         with
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(63,49): warning C4244:         [
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(63,49): warning C4244:             t=int
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(63,49): warning C4244:         ]
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(63,49): warning C4244:         and
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(63,49): warning C4244:         [
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(63,49): warning C4244:             t=float
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(63,49): warning C4244:         ]
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(63,34): warning C4244: аргумент: преобразование "t" в "t", возможна потеря данных
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(63,34): warning C4244:         with
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(63,34): warning C4244:         [
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(63,34): warning C4244:             t=int
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(63,34): warning C4244:         ]
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(63,34): warning C4244:         and
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(63,34): warning C4244:         [
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(63,34): warning C4244:             t=float
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(63,34): warning C4244:         ]
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(64,64): warning C4244: аргумент: преобразование "t" в "t", возможна потеря данных
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(64,64): warning C4244:         with
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(64,64): warning C4244:         [
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(64,64): warning C4244:             t=int
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(64,64): warning C4244:         ]
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(64,64): warning C4244:         and
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(64,64): warning C4244:         [
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(64,64): warning C4244:             t=float
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(64,64): warning C4244:         ]
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(64,49): warning C4244: аргумент: преобразование "t" в "t", возможна потеря данных
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(64,49): warning C4244:         with
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(64,49): warning C4244:         [
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(64,49): warning C4244:             t=int
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(64,49): warning C4244:         ]
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(64,49): warning C4244:         and
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(64,49): warning C4244:         [
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(64,49): warning C4244:             t=float
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(64,49): warning C4244:         ]
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(64,34): warning C4244: аргумент: преобразование "t" в "t", возможна потеря данных
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(64,34): warning C4244:         with
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(64,34): warning C4244:         [
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(64,34): warning C4244:             t=int
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(64,34): warning C4244:         ]
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(64,34): warning C4244:         and
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(64,34): warning C4244:         [
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(64,34): warning C4244:             t=float
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(64,34): warning C4244:         ]
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(86,28): warning C4244: *=: преобразование "float" в "unsigned char", возможна потеря данных
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(87,28): warning C4244: *=: преобразование "float" в "unsigned char", возможна потеря данных
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(88,28): warning C4244: *=: преобразование "float" в "unsigned char", возможна потеря данных
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(90,33): warning C4244: аргумент: преобразование "t" в "int", возможна потеря данных
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(90,33): warning C4244:         with
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(90,33): warning C4244:         [
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(90,33): warning C4244:             t=float
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(90,33): warning C4244:         ]
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(90,28): warning C4244: аргумент: преобразование "t" в "int", возможна потеря данных
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(90,28): warning C4244:         with
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(90,28): warning C4244:         [
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(90,28): warning C4244:             t=float
-C:\Users\Home\Desktop\bigboss.cg\openglathome\openglathome.cpp(90,28): warning C4244:         ]
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(55,23): warning C4244: =: преобразование "t" в "t", возможна потеря данных
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(55,23): warning C4244:         with
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(55,23): warning C4244:         [
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(55,23): warning C4244:             t=int
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(55,23): warning C4244:         ]
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(55,23): warning C4244:         and
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(55,23): warning C4244:         [
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(55,23): warning C4244:             t=float
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(55,23): warning C4244:         ]
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(56,27): warning C4244: =: преобразование "t" в "t", возможна потеря данных
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(56,27): warning C4244:         with
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(56,27): warning C4244:         [
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(56,27): warning C4244:             t=int
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(56,27): warning C4244:         ]
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(56,27): warning C4244:         and
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(56,27): warning C4244:         [
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(56,27): warning C4244:             t=float
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(56,27): warning C4244:         ]
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(58,64): warning C4244: аргумент: преобразование "t" в "t", возможна потеря данных
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(58,64): warning C4244:         with
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(58,64): warning C4244:         [
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(58,64): warning C4244:             t=int
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(58,64): warning C4244:         ]
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(58,64): warning C4244:         and
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(58,64): warning C4244:         [
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(58,64): warning C4244:             t=float
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(58,64): warning C4244:         ]
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(58,49): warning C4244: аргумент: преобразование "t" в "t", возможна потеря данных
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(58,49): warning C4244:         with
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(58,49): warning C4244:         [
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(58,49): warning C4244:             t=int
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(58,49): warning C4244:         ]
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(58,49): warning C4244:         and
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(58,49): warning C4244:         [
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(58,49): warning C4244:             t=float
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(58,49): warning C4244:         ]
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(58,34): warning C4244: аргумент: преобразование "t" в "t", возможна потеря данных
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(58,34): warning C4244:         with
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(58,34): warning C4244:         [
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(58,34): warning C4244:             t=int
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(58,34): warning C4244:         ]
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(58,34): warning C4244:         and
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(58,34): warning C4244:         [
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(58,34): warning C4244:             t=float
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(58,34): warning C4244:         ]
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(59,64): warning C4244: аргумент: преобразование "t" в "t", возможна потеря данных
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(59,64): warning C4244:         with
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(59,64): warning C4244:         [
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(59,64): warning C4244:             t=int
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(59,64): warning C4244:         ]
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(59,64): warning C4244:         and
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(59,64): warning C4244:         [
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(59,64): warning C4244:             t=float
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(59,64): warning C4244:         ]
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(59,49): warning C4244: аргумент: преобразование "t" в "t", возможна потеря данных
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(59,49): warning C4244:         with
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(59,49): warning C4244:         [
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(59,49): warning C4244:             t=int
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(59,49): warning C4244:         ]
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(59,49): warning C4244:         and
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(59,49): warning C4244:         [
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(59,49): warning C4244:             t=float
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(59,49): warning C4244:         ]
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(59,34): warning C4244: аргумент: преобразование "t" в "t", возможна потеря данных
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(59,34): warning C4244:         with
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(59,34): warning C4244:         [
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(59,34): warning C4244:             t=int
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(59,34): warning C4244:         ]
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(59,34): warning C4244:         and
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(59,34): warning C4244:         [
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(59,34): warning C4244:             t=float
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(59,34): warning C4244:         ]
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(60,64): warning C4244: аргумент: преобразование "t" в "t", возможна потеря данных
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(60,64): warning C4244:         with
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(60,64): warning C4244:         [
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(60,64): warning C4244:             t=int
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(60,64): warning C4244:         ]
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(60,64): warning C4244:         and
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(60,64): warning C4244:         [
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(60,64): warning C4244:             t=float
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(60,64): warning C4244:         ]
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(60,49): warning C4244: аргумент: преобразование "t" в "t", возможна потеря данных
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(60,49): warning C4244:         with
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(60,49): warning C4244:         [
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(60,49): warning C4244:             t=int
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(60,49): warning C4244:         ]
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(60,49): warning C4244:         and
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(60,49): warning C4244:         [
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(60,49): warning C4244:             t=float
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(60,49): warning C4244:         ]
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(60,34): warning C4244: аргумент: преобразование "t" в "t", возможна потеря данных
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(60,34): warning C4244:         with
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(60,34): warning C4244:         [
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(60,34): warning C4244:             t=int
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(60,34): warning C4244:         ]
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(60,34): warning C4244:         and
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(60,34): warning C4244:         [
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(60,34): warning C4244:             t=float
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(60,34): warning C4244:         ]
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(90,32): warning C4244: *=: преобразование "float" в "unsigned char", возможна потеря данных
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(91,32): warning C4244: *=: преобразование "float" в "unsigned char", возможна потеря данных
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(92,32): warning C4244: *=: преобразование "float" в "unsigned char", возможна потеря данных
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(95,33): warning C4244: аргумент: преобразование "t" в "int", возможна потеря данных
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(95,33): warning C4244:         with
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(95,33): warning C4244:         [
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(95,33): warning C4244:             t=float
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(95,33): warning C4244:         ]
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(95,28): warning C4244: аргумент: преобразование "t" в "int", возможна потеря данных
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(95,28): warning C4244:         with
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(95,28): warning C4244:         [
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(95,28): warning C4244:             t=float
+C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\openglathome\openglathome.cpp(95,28): warning C4244:         ]
   Создание кода...
-  openglathome.vcxproj -> C:\Users\Home\Desktop\bigboss.cg\x64\Debug\openglathome.exe
+  openglathome.vcxproj -> C:\Users\Home\Documents\GitHub\CGachimuchii\bigbossscg\x64\Debug\openglathome.exe
