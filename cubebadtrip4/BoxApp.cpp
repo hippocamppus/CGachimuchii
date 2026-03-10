@@ -2,6 +2,8 @@
 #include "MathHelper.h"
 #include "UploadBuffer.h"
 #include <d3dx12.h>
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "tiny_obj_loader.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -26,26 +28,25 @@ public:
     BoxApp& operator=(const BoxApp& rhs) = delete;
     ~BoxApp();
 
-    virtual bool Initialize()override;
+    virtual bool Initialize() override;
 
 private:
-    virtual void OnResize()override;
-    virtual void Update(const GameTimer& gt)override;
-    virtual void Draw(const GameTimer& gt)override;
+    virtual void OnResize() override;
+    virtual void Update(const GameTimer& gt) override;
+    virtual void Draw(const GameTimer& gt) override;
 
-    virtual void OnMouseDown(WPARAM btnState, int x, int y)override;
-    virtual void OnMouseUp(WPARAM btnState, int x, int y)override;
-    virtual void OnMouseMove(WPARAM btnState, int x, int y)override;
+    virtual void OnMouseDown(WPARAM btnState, int x, int y) override;
+    virtual void OnMouseUp(WPARAM btnState, int x, int y) override;
+    virtual void OnMouseMove(WPARAM btnState, int x, int y) override;
 
     void BuildDescriptorHeaps();
     void BuildConstantBuffers();
     void BuildRootSignature();
     void BuildShadersAndInputLayout();
-    void BuildBoxGeometry();
+    void BuildBoxGeometry();  // Здесь теперь загружается Sponza!
     void BuildPSO();
 
 private:
-
     ComPtr<ID3D12RootSignature> mRootSignature = nullptr;
     ComPtr<ID3D12DescriptorHeap> mCbvHeap = nullptr;
 
@@ -66,7 +67,7 @@ private:
 
     float mTheta = 1.5f * XM_PI;
     float mPhi = XM_PIDIV4;
-    float mRadius = 5.0f;
+    float mRadius = 400.0f;  // ВАЖНО: увеличен радиус для большой модели!
 
     POINT mLastMousePos;
 };
@@ -113,7 +114,7 @@ bool BoxApp::Initialize()
     BuildConstantBuffers();
     BuildRootSignature();
     BuildShadersAndInputLayout();
-    BuildBoxGeometry();
+    BuildBoxGeometry();  // Загружает Sponza
     BuildPSO();
 
     ThrowIfFailed(mCommandList->Close());
@@ -129,7 +130,7 @@ void BoxApp::OnResize()
 {
     D3DApp::OnResize();
 
-    XMMATRIX P = XMMatrixPerspectiveFovLH(0.25f * MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
+    XMMATRIX P = XMMatrixPerspectiveFovLH(0.25f * MathHelper::Pi, AspectRatio(), 1.0f, 100000.0f);
     XMStoreFloat4x4(&mProj, P);
 }
 
@@ -180,6 +181,20 @@ void BoxApp::Draw(const GameTimer& gt)
 
     mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
 
+    // Поднимаем модель на 50 единиц вверх
+    XMMATRIX translate = XMMatrixTranslation(0.0f, 50.0f, 0.0f);
+    XMMATRIX world = translate;
+
+    XMMATRIX view = XMLoadFloat4x4(&mView);
+    XMMATRIX proj = XMLoadFloat4x4(&mProj);
+    XMMATRIX worldViewProj = world * view * proj;
+
+    // Обновляем константный буфер
+    ObjectConstants objConstants;
+    XMStoreFloat4x4(&objConstants.WorldViewProj, XMMatrixTranspose(worldViewProj));
+    mObjectCB->CopyData(0, objConstants);
+    
+    // Рисуем Sponza
     auto vbv = mBoxGeo->VertexBufferView();
     auto ibv = mBoxGeo->IndexBufferView();
     mCommandList->IASetVertexBuffers(0, 1, &vbv);
@@ -239,7 +254,7 @@ void BoxApp::OnMouseMove(WPARAM btnState, int x, int y)
 
         mRadius += dx - dy;
 
-        mRadius = MathHelper::Clamp(mRadius, 3.0f, 15.0f);
+        mRadius = MathHelper::Clamp(mRadius, 3.0f, 1000.0f);
     }
 
     mLastMousePos.x = x;
@@ -264,12 +279,10 @@ void BoxApp::BuildConstantBuffers()
     UINT objCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
 
     D3D12_GPU_VIRTUAL_ADDRESS cbAddress = mObjectCB->Resource()->GetGPUVirtualAddress();
-    int boxCBufIndex = 0;
-    cbAddress += boxCBufIndex * objCBByteSize;
 
     D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc;
     cbvDesc.BufferLocation = cbAddress;
-    cbvDesc.SizeInBytes = d3dUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
+    cbvDesc.SizeInBytes = objCBByteSize;
 
     md3dDevice->CreateConstantBufferView(
         &cbvDesc,
@@ -307,8 +320,6 @@ void BoxApp::BuildRootSignature()
 
 void BoxApp::BuildShadersAndInputLayout()
 {
-    HRESULT hr = S_OK;
-
     mvsByteCode = d3dUtil::CompileShader(L"Shaders\\color.hlsl", nullptr, "VS", "vs_5_0");
     mpsByteCode = d3dUtil::CompileShader(L"Shaders\\color.hlsl", nullptr, "PS", "ps_5_0");
 
@@ -321,56 +332,74 @@ void BoxApp::BuildShadersAndInputLayout()
 
 void BoxApp::BuildBoxGeometry()
 {
-    // 8 вершин куба с разными цветами для плавных градиентов
-    // Каждая вершина имеет уникальный цвет
-    std::array<Vertex, 8> vertices =
+    // 1) Load OBJ (Sponza)
+    tinyobj::ObjReader reader;
+    if (!reader.ParseFromFile("Models/sponza.obj"))
     {
-        // Задняя грань (Z = -1)
-        Vertex({ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT4(1.0f, 0.0f, 0.0f, 1.0f) }),   // красный
-        Vertex({ XMFLOAT3(-1.0f, +1.0f, -1.0f), XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f) }),   // зелёный
-        Vertex({ XMFLOAT3(+1.0f, +1.0f, -1.0f), XMFLOAT4(0.0f, 0.0f, 1.0f, 1.0f) }),   // синий
-        Vertex({ XMFLOAT3(+1.0f, -1.0f, -1.0f), XMFLOAT4(1.0f, 1.0f, 0.0f, 1.0f) }),   // жёлтый
+        if (!reader.Error().empty())
+            OutputDebugStringA(reader.Error().c_str());
+        throw std::runtime_error("Failed to load OBJ");
+    }
 
-        // Передняя грань (Z = +1)
-        Vertex({ XMFLOAT3(-1.0f, -1.0f, +1.0f), XMFLOAT4(0.0f, 1.0f, 1.0f, 1.0f) }),   // голубой
-        Vertex({ XMFLOAT3(-1.0f, +1.0f, +1.0f), XMFLOAT4(1.0f, 0.0f, 1.0f, 1.0f) }),   // фиолетовый
-        Vertex({ XMFLOAT3(+1.0f, +1.0f, +1.0f), XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f) }),   // белый
-        Vertex({ XMFLOAT3(+1.0f, -1.0f, +1.0f), XMFLOAT4(1.0f, 0.5f, 0.0f, 1.0f) })    // оранжевый
-    };
+    const tinyobj::attrib_t& attrib = reader.GetAttrib();
+    const std::vector<tinyobj::shape_t>& shapes = reader.GetShapes();
 
-    // Те же 36 индексов для 8 вершин
-    std::array<std::uint16_t, 36> indices =
+    // 2) Compute bounding box (for nice gradient vertex colors)
+    DirectX::XMFLOAT3 bmin(+FLT_MAX, +FLT_MAX, +FLT_MAX);
+    DirectX::XMFLOAT3 bmax(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+
+    for (size_t i = 0; i + 2 < attrib.vertices.size(); i += 3)
     {
-        // front face
-        0, 1, 2,
-        0, 2, 3,
+        float x = attrib.vertices[i + 0];
+        float y = attrib.vertices[i + 1];
+        float z = attrib.vertices[i + 2];
+        bmin.x = (std::min)(bmin.x, x); bmin.y = (std::min)(bmin.y, y); bmin.z = (std::min)(bmin.z, z);
+        bmax.x = (std::max)(bmax.x, x); bmax.y = (std::max)(bmax.y, y); bmax.z = (std::max)(bmax.z, z);
+    }
 
-        // back face
-        4, 6, 5,
-        4, 7, 6,
+    auto safeInv = [](float d) { return (fabsf(d) < 1e-8f) ? 0.0f : (1.0f / d); };
+    float invX = safeInv(bmax.x - bmin.x);
+    float invY = safeInv(bmax.y - bmin.y);
+    float invZ = safeInv(bmax.z - bmin.z);
 
-        // left face
-        4, 5, 1,
-        4, 1, 0,
+    XMFLOAT3 center(
+        0.5f * (bmin.x + bmax.x),
+        0.5f * (bmin.y + bmax.y),
+        0.5f * (bmin.z + bmax.z));
 
-        // right face
-        3, 2, 6,
-        3, 6, 7,
+    // 3) Build vertex buffer
+    std::vector<Vertex> vertices;
+    std::vector<std::uint32_t> indices;
 
-        // top face
-        1, 5, 6,
-        1, 6, 2,
+    for (const auto& shape : shapes)
+    {
+        for (const auto& idx : shape.mesh.indices)
+        {
+            if (idx.vertex_index < 0) continue;
 
-        // bottom face
-        4, 0, 3,
-        4, 3, 7
-    };
+            Vertex v;
+
+            const int vi = 3 * idx.vertex_index;
+            float x = attrib.vertices[vi + 0];
+            float y = attrib.vertices[vi + 1];
+            float z = attrib.vertices[vi + 2];
+
+            v.Pos = DirectX::XMFLOAT3(x - center.x, y - center.y, z - center.z);
+
+            // Градиент по высоте (от черного к белому)
+            float ny = (y - bmin.y) / (bmax.y - bmin.y);
+            v.Color = XMFLOAT4(ny, ny, ny, 1.0f);
+
+            vertices.push_back(v);
+            indices.push_back((std::uint32_t)indices.size());
+        }
+    }
 
     const UINT vbByteSize = (UINT)vertices.size() * sizeof(Vertex);
-    const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
+    const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint32_t);
 
     mBoxGeo = std::make_unique<MeshGeometry>();
-    mBoxGeo->Name = "boxGeo";
+    mBoxGeo->Name = "Sponza";
 
     ThrowIfFailed(D3DCreateBlob(vbByteSize, &mBoxGeo->VertexBufferCPU));
     CopyMemory(mBoxGeo->VertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
@@ -386,7 +415,7 @@ void BoxApp::BuildBoxGeometry()
 
     mBoxGeo->VertexByteStride = sizeof(Vertex);
     mBoxGeo->VertexBufferByteSize = vbByteSize;
-    mBoxGeo->IndexFormat = DXGI_FORMAT_R16_UINT;
+    mBoxGeo->IndexFormat = DXGI_FORMAT_R32_UINT;
     mBoxGeo->IndexBufferByteSize = ibByteSize;
 
     SubmeshGeometry submesh;

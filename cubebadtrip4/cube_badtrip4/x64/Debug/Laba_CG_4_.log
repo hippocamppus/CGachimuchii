@@ -1,2 +1,9 @@
 ﻿  BoxApp.cpp
-  Laba_CG_4_.vcxproj -> C:\Users\Home\Desktop\cubebadtrip4\x64\Debug\cube_badtrip4.exe
+  d3dApp.cpp
+  d3dUtil.cpp
+  DDSTextureLoader.cpp
+  GameTimer.cpp
+  MathHelper.cpp
+  Создание кода...
+  LINK : не найден или не выполнена сборка C:\Users\Home\Documents\GitHub\CGachimuchii\cubebadtrip4\x64\Debug\cube_badtrip4.exe при последней инкрементной компоновке; выполняется полная компоновка
+  Laba_CG_4_.vcxproj -> C:\Users\Home\Documents\GitHub\CGachimuchii\cubebadtrip4\x64\Debug\cube_badtrip4.exe
