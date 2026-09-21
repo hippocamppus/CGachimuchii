@@ -7,7 +7,11 @@
 #include <cfloat>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
+#include <fstream>
 #include <stdexcept>
+#include <string>
+#include <vector>
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
@@ -16,6 +20,313 @@ using Microsoft::WRL::ComPtr;
 
 using namespace DirectX;
 using namespace DirectX::PackedVector;
+
+struct TgaImage
+{
+    UINT Width = 0;
+    UINT Height = 0;
+
+    // Пиксели будут храниться в формате RGBA:
+    // красный, зелёный, синий, прозрачность
+    std::vector<std::uint8_t> Pixels;
+};
+
+TgaImage LoadTgaFile(const std::wstring& filename)
+{
+    std::ifstream file(
+        filename.c_str(),
+        std::ios::binary);
+
+    if (!file)
+    {
+        throw std::runtime_error(
+            "Cannot open TGA texture file.");
+    }
+
+    // Заголовок TGA всегда содержит 18 байт
+    std::uint8_t header[18] = {};
+
+    file.read(
+        reinterpret_cast<char*>(header),
+        sizeof(header));
+
+    if (!file)
+    {
+        throw std::runtime_error(
+            "Cannot read TGA header.");
+    }
+
+    const UINT idLength = header[0];
+    const UINT colorMapType = header[1];
+    const UINT imageType = header[2];
+
+    const UINT width =
+        static_cast<UINT>(header[12]) |
+        (static_cast<UINT>(header[13]) << 8);
+
+    const UINT height =
+        static_cast<UINT>(header[14]) |
+        (static_cast<UINT>(header[15]) << 8);
+
+    const UINT bitsPerPixel = header[16];
+
+    if (width == 0 || height == 0)
+    {
+        throw std::runtime_error(
+            "TGA texture has invalid size.");
+    }
+
+    // Мы поддерживаем обычные несжатые цветовые TGA
+    if (colorMapType != 0)
+    {
+        throw std::runtime_error(
+            "Color-mapped TGA is not supported.");
+    }
+
+    if (imageType != 2)
+    {
+        throw std::runtime_error(
+            "Only uncompressed TGA is supported.");
+    }
+
+    if (bitsPerPixel != 24 && bitsPerPixel != 32)
+    {
+        throw std::runtime_error(
+            "Only 24-bit and 32-bit TGA are supported.");
+    }
+
+    // Пропускаем дополнительный идентификатор файла
+    file.seekg(idLength, std::ios::cur);
+
+    const UINT bytesPerPixel = bitsPerPixel / 8;
+
+    const size_t sourceSize =
+        static_cast<size_t>(width) *
+        static_cast<size_t>(height) *
+        bytesPerPixel;
+
+    std::vector<std::uint8_t> sourcePixels(sourceSize);
+
+    file.read(
+        reinterpret_cast<char*>(sourcePixels.data()),
+        sourceSize);
+
+    if (!file)
+    {
+        throw std::runtime_error(
+            "Cannot read TGA pixel data.");
+    }
+
+    TgaImage image;
+    image.Width = width;
+    image.Height = height;
+
+    const size_t destinationSize =
+        static_cast<size_t>(width) *
+        static_cast<size_t>(height) *
+        4;
+
+    image.Pixels.resize(destinationSize);
+
+    // Бит 5 показывает направление строк:
+    // 0 — изображение записано снизу вверх,
+    // 1 — сверху вниз.
+    const bool topOrigin =
+        (header[17] & 0x20) != 0;
+
+    // Бит 4 показывает направление столбцов
+    const bool rightOrigin =
+        (header[17] & 0x10) != 0;
+
+    for (UINT y = 0; y < height; ++y)
+    {
+        UINT sourceY =
+            topOrigin ? y : height - 1 - y;
+
+        for (UINT x = 0; x < width; ++x)
+        {
+            UINT sourceX =
+                rightOrigin ? width - 1 - x : x;
+
+            const size_t sourceIndex =
+                (static_cast<size_t>(sourceY) * width +
+                    sourceX) *
+                bytesPerPixel;
+
+            const size_t destinationIndex =
+                (static_cast<size_t>(y) * width +
+                    x) *
+                4;
+
+            // В TGA цвет хранится как BGR,
+            // а DirectX-текстура будет RGBA.
+            image.Pixels[destinationIndex + 0] =
+                sourcePixels[sourceIndex + 2];
+
+            image.Pixels[destinationIndex + 1] =
+                sourcePixels[sourceIndex + 1];
+
+            image.Pixels[destinationIndex + 2] =
+                sourcePixels[sourceIndex + 0];
+
+            if (bitsPerPixel == 32)
+            {
+                image.Pixels[destinationIndex + 3] =
+                    sourcePixels[sourceIndex + 3];
+            }
+            else
+            {
+                image.Pixels[destinationIndex + 3] = 255;
+            }
+        }
+    }
+
+    return image;
+}
+
+void CreateTextureFromTga(
+    ID3D12Device* device,
+    ID3D12GraphicsCommandList* commandList,
+    Texture& texture)
+{
+    TgaImage image =
+        LoadTgaFile(texture.Filename);
+
+    D3D12_RESOURCE_DESC textureDesc =
+        CD3DX12_RESOURCE_DESC::Tex2D(
+            DXGI_FORMAT_R8G8B8A8_UNORM,
+            image.Width,
+            image.Height,
+            1,
+            1);
+
+    CD3DX12_HEAP_PROPERTIES defaultHeap(
+        D3D12_HEAP_TYPE_DEFAULT);
+
+    ThrowIfFailed(
+        device->CreateCommittedResource(
+            &defaultHeap,
+            D3D12_HEAP_FLAG_NONE,
+            &textureDesc,
+            D3D12_RESOURCE_STATE_COPY_DEST,
+            nullptr,
+            IID_PPV_ARGS(&texture.Resource)));
+
+    UINT64 uploadBufferSize = 0;
+    UINT numRows = 0;
+    UINT64 rowSizeInBytes = 0;
+
+    D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint = {};
+
+    device->GetCopyableFootprints(
+        &textureDesc,
+        0,
+        1,
+        0,
+        &footprint,
+        &numRows,
+        &rowSizeInBytes,
+        &uploadBufferSize);
+
+    CD3DX12_HEAP_PROPERTIES uploadHeap(
+        D3D12_HEAP_TYPE_UPLOAD);
+
+    D3D12_RESOURCE_DESC uploadBufferDesc =
+        CD3DX12_RESOURCE_DESC::Buffer(
+            uploadBufferSize);
+
+    ThrowIfFailed(
+        device->CreateCommittedResource(
+            &uploadHeap,
+            D3D12_HEAP_FLAG_NONE,
+            &uploadBufferDesc,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr,
+            IID_PPV_ARGS(&texture.UploadHeap)));
+
+    std::uint8_t* mappedData = nullptr;
+
+    D3D12_RANGE readRange = {};
+    readRange.Begin = 0;
+    readRange.End = 0;
+
+    ThrowIfFailed(
+        texture.UploadHeap->Map(
+            0,
+            &readRange,
+            reinterpret_cast<void**>(&mappedData)));
+
+    const UINT sourceRowSize =
+        image.Width * 4;
+
+    for (UINT row = 0; row < image.Height; ++row)
+    {
+        std::memcpy(
+            mappedData +
+            footprint.Offset +
+            static_cast<size_t>(row) *
+            footprint.Footprint.RowPitch,
+
+            image.Pixels.data() +
+            static_cast<size_t>(row) *
+            sourceRowSize,
+
+            sourceRowSize);
+    }
+
+    texture.UploadHeap->Unmap(0, nullptr);
+
+    D3D12_TEXTURE_COPY_LOCATION destination = {};
+    destination.pResource =
+        texture.Resource.Get();
+
+    destination.Type =
+        D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+
+    destination.SubresourceIndex = 0;
+
+    D3D12_TEXTURE_COPY_LOCATION source = {};
+    source.pResource =
+        texture.UploadHeap.Get();
+
+    source.Type =
+        D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+
+    source.PlacedFootprint = footprint;
+
+    commandList->CopyTextureRegion(
+        &destination,
+        0,
+        0,
+        0,
+        &source,
+        nullptr);
+
+    auto textureBarrier =
+        CD3DX12_RESOURCE_BARRIER::Transition(
+            texture.Resource.Get(),
+            D3D12_RESOURCE_STATE_COPY_DEST,
+            D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+
+    commandList->ResourceBarrier(
+        1,
+        &textureBarrier);
+}
+
+struct MaterialData
+{
+    std::string Name;
+    std::wstring DiffuseFilename;
+};
+
+struct MaterialDraw
+{
+    int MaterialIndex = -1;
+
+    UINT IndexCount = 0;
+    UINT StartIndexLocation = 0;
+    UINT BaseVertexLocation = 0;
+};
 
 struct Vertex
 {
@@ -52,6 +363,7 @@ private:
     virtual void OnMouseUp(WPARAM btnState, int x, int y) override;
     virtual void OnMouseMove(WPARAM btnState, int x, int y) override;
 
+    void BuildTexture();
     void BuildDescriptorHeaps();
     void BuildConstantBuffers();
     void BuildRootSignature();
@@ -67,6 +379,14 @@ private:
     std::unique_ptr<UploadBuffer<ObjectConstants>> mObjectCB = nullptr;
 
     std::unique_ptr<MeshGeometry> mBoxGeo = nullptr;
+
+    std::vector<MaterialData> mMaterials;
+
+    std::vector<MaterialDraw> mDrawItems;
+
+    std::vector<std::unique_ptr<Texture>> mTextures;
+
+    UINT mCbvSrvUavDescriptorSize = 0;
 
     ComPtr<ID3DBlob> mvsByteCode = nullptr;
     ComPtr<ID3DBlob> mpsByteCode = nullptr;
@@ -122,6 +442,17 @@ int WINAPI WinMain(
 
         return 0;
     }
+    catch (const std::exception& e)
+    {
+        MessageBoxA(
+            nullptr,
+            e.what(),
+            "Application error",
+            MB_OK
+        );
+
+        return 0;
+    }
 }
 
 BoxApp::BoxApp(HINSTANCE hInstance)
@@ -147,11 +478,12 @@ bool BoxApp::Initialize()
         )
     );
 
+    BuildBoxGeometry();
+    BuildTexture();
     BuildDescriptorHeaps();
     BuildConstantBuffers();
     BuildRootSignature();
     BuildShadersAndInputLayout();
-    BuildBoxGeometry();
     BuildPSO();
 
     ThrowIfFailed(mCommandList->Close());
@@ -386,21 +718,51 @@ void BoxApp::Draw(const GameTimer& gt)
     );
 
     mCommandList->IASetPrimitiveTopology(
-        D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST
+        D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST
     );
+
+    CD3DX12_GPU_DESCRIPTOR_HANDLE cbvHandle(
+        mCbvHeap
+        ->GetGPUDescriptorHandleForHeapStart());
 
     mCommandList->SetGraphicsRootDescriptorTable(
         0,
-        mCbvHeap->GetGPUDescriptorHandleForHeapStart()
-    );
+        cbvHandle);
 
-    mCommandList->DrawIndexedInstanced(
-        mBoxGeo->DrawArgs["box"].IndexCount,
-        1,
-        0,
-        0,
-        0
-    );
+    for (const MaterialDraw& drawItem : mDrawItems)
+    {
+        if (drawItem.MaterialIndex < 0)
+        {
+            continue;
+        }
+
+        if (
+            static_cast<size_t>(
+                drawItem.MaterialIndex)
+            >= mTextures.size())
+        {
+            continue;
+        }
+
+        CD3DX12_GPU_DESCRIPTOR_HANDLE srvHandle(
+            mCbvHeap
+            ->GetGPUDescriptorHandleForHeapStart());
+
+        srvHandle.Offset(
+            drawItem.MaterialIndex + 1,
+            mCbvSrvUavDescriptorSize);
+
+        mCommandList->SetGraphicsRootDescriptorTable(
+            1,
+            srvHandle);
+
+        mCommandList->DrawIndexedInstanced(
+            drawItem.IndexCount,
+            1,
+            drawItem.StartIndexLocation,
+            drawItem.BaseVertexLocation,
+            0);
+    }
 
     transition =
         CD3DX12_RESOURCE_BARRIER::Transition(
@@ -522,11 +884,38 @@ void BoxApp::OnMouseMove(
     mLastMousePos.y = y;
 }
 
+void BoxApp::BuildTexture()
+{
+    mTextures.clear();
+
+    for (const MaterialData& material : mMaterials)
+    {
+        auto texture =
+            std::make_unique<Texture>();
+
+        texture->Name =
+            "Sponza_" + material.Name;
+
+        texture->Filename =
+            material.DiffuseFilename;
+
+        CreateTextureFromTga(
+            md3dDevice.Get(),
+            mCommandList.Get(),
+            *texture);
+
+        mTextures.push_back(
+            std::move(texture));
+    }
+}
+
 void BoxApp::BuildDescriptorHeaps()
 {
-    D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc;
+    D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc = {};
 
-    cbvHeapDesc.NumDescriptors = 1;
+    cbvHeapDesc.NumDescriptors =
+        1 + static_cast<UINT>(
+            mTextures.size());
     cbvHeapDesc.Type =
         D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 
@@ -535,34 +924,34 @@ void BoxApp::BuildDescriptorHeaps()
 
     cbvHeapDesc.NodeMask = 0;
 
+    mCbvSrvUavDescriptorSize =
+        md3dDevice->GetDescriptorHandleIncrementSize(
+            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
     ThrowIfFailed(
         md3dDevice->CreateDescriptorHeap(
             &cbvHeapDesc,
-            IID_PPV_ARGS(&mCbvHeap)
-        )
-    );
+            IID_PPV_ARGS(&mCbvHeap)));
 }
 
 void BoxApp::BuildConstantBuffers()
 {
     mObjectCB =
         std::make_unique<
-        UploadBuffer<ObjectConstants>
-        >(
+        UploadBuffer<ObjectConstants>>(
             md3dDevice.Get(),
             1,
-            true
-        );
+            true);
 
     UINT objCBByteSize =
         d3dUtil::CalcConstantBufferByteSize(
-            sizeof(ObjectConstants)
-        );
+            sizeof(ObjectConstants));
 
     D3D12_GPU_VIRTUAL_ADDRESS cbAddress =
-        mObjectCB->Resource()->GetGPUVirtualAddress();
+        mObjectCB->Resource()
+        ->GetGPUVirtualAddress();
 
-    D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc;
+    D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
 
     cbvDesc.BufferLocation =
         cbAddress;
@@ -572,34 +961,99 @@ void BoxApp::BuildConstantBuffers()
 
     md3dDevice->CreateConstantBufferView(
         &cbvDesc,
-        mCbvHeap->GetCPUDescriptorHandleForHeapStart()
-    );
+        mCbvHeap
+        ->GetCPUDescriptorHandleForHeapStart());
+
+    for (
+        UINT textureIndex = 0;
+        textureIndex <
+        static_cast<UINT>(mTextures.size());
+        ++textureIndex)
+    {
+        D3D12_RESOURCE_DESC textureDesc =
+            mTextures[textureIndex]
+            ->Resource
+            ->GetDesc();
+
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+
+        srvDesc.Shader4ComponentMapping =
+            D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+
+        srvDesc.Format =
+            textureDesc.Format;
+
+        srvDesc.ViewDimension =
+            D3D12_SRV_DIMENSION_TEXTURE2D;
+
+        srvDesc.Texture2D.MostDetailedMip =
+            0;
+
+        srvDesc.Texture2D.MipLevels =
+            textureDesc.MipLevels;
+
+        srvDesc.Texture2D.ResourceMinLODClamp =
+            0.0f;
+
+        CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle(
+            mCbvHeap
+            ->GetCPUDescriptorHandleForHeapStart());
+
+        // Нулевой элемент занят CBV,
+        // поэтому первая текстура начинается с 1.
+        srvHandle.Offset(
+            static_cast<INT>(textureIndex + 1),
+            mCbvSrvUavDescriptorSize);
+
+        md3dDevice->CreateShaderResourceView(
+            mTextures[textureIndex]
+            ->Resource
+            .Get(),
+
+            &srvDesc,
+            srvHandle);
+    }
 }
 
 void BoxApp::BuildRootSignature()
 {
-    CD3DX12_ROOT_PARAMETER slotRootParameter[1];
+    CD3DX12_ROOT_PARAMETER slotRootParameter[2];
 
     CD3DX12_DESCRIPTOR_RANGE cbvTable;
 
     cbvTable.Init(
         D3D12_DESCRIPTOR_RANGE_TYPE_CBV,
         1,
-        0
-    );
+        0);
+
+    CD3DX12_DESCRIPTOR_RANGE srvTable;
+
+    srvTable.Init(
+        D3D12_DESCRIPTOR_RANGE_TYPE_SRV,
+        1,
+        0);
 
     slotRootParameter[0].InitAsDescriptorTable(
         1,
-        &cbvTable
-    );
+        &cbvTable);
+
+    slotRootParameter[1].InitAsDescriptorTable(
+        1,
+        &srvTable);
+
+    CD3DX12_STATIC_SAMPLER_DESC sampler(
+        0,
+        D3D12_FILTER_MIN_MAG_MIP_LINEAR,
+        D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+        D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+        D3D12_TEXTURE_ADDRESS_MODE_WRAP);
 
     CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(
-        1,
+        2,
         slotRootParameter,
-        0,
-        nullptr,
-        D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT
-    );
+        1,
+        &sampler,
+        D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
     ComPtr<ID3DBlob> serializedRootSig = nullptr;
     ComPtr<ID3DBlob> errorBlob = nullptr;
@@ -609,16 +1063,13 @@ void BoxApp::BuildRootSignature()
             &rootSigDesc,
             D3D_ROOT_SIGNATURE_VERSION_1,
             serializedRootSig.GetAddressOf(),
-            errorBlob.GetAddressOf()
-        );
+            errorBlob.GetAddressOf());
 
     if (errorBlob != nullptr)
     {
         ::OutputDebugStringA(
             static_cast<char*>(
-                errorBlob->GetBufferPointer()
-                )
-        );
+                errorBlob->GetBufferPointer()));
     }
 
     ThrowIfFailed(hr);
@@ -628,11 +1079,8 @@ void BoxApp::BuildRootSignature()
             0,
             serializedRootSig->GetBufferPointer(),
             serializedRootSig->GetBufferSize(),
-            IID_PPV_ARGS(&mRootSignature)
-        )
-    );
+            IID_PPV_ARGS(&mRootSignature)));
 }
-
 void BoxApp::BuildShadersAndInputLayout()
 {
     mvsByteCode =
@@ -640,16 +1088,14 @@ void BoxApp::BuildShadersAndInputLayout()
             L"Shaders\\color.hlsl",
             nullptr,
             "VS",
-            "vs_5_0"
-        );
+            "vs_5_0");
 
     mpsByteCode =
         d3dUtil::CompileShader(
             L"Shaders\\color.hlsl",
             nullptr,
             "PS",
-            "ps_5_0"
-        );
+            "ps_5_0");
 
     mInputLayout =
     {
@@ -694,13 +1140,11 @@ void BoxApp::BuildBoxGeometry()
         if (!reader.Error().empty())
         {
             OutputDebugStringA(
-                reader.Error().c_str()
-            );
+                reader.Error().c_str());
         }
 
         throw std::runtime_error(
-            "Failed to load OBJ"
-        );
+            "Failed to load OBJ.");
     }
 
     const tinyobj::attrib_t& attrib =
@@ -709,20 +1153,89 @@ void BoxApp::BuildBoxGeometry()
     const std::vector<tinyobj::shape_t>& shapes =
         reader.GetShapes();
 
+    const std::vector<tinyobj::material_t>& objMaterials =
+        reader.GetMaterials();
+
+    mMaterials.clear();
+
+    const std::wstring fallbackTexture =
+        L"Models\\textures\\sponza_arch_diff.tga";
+
+    for (size_t i = 0; i < objMaterials.size(); ++i)
+    {
+        const tinyobj::material_t& objMaterial =
+            objMaterials[i];
+
+        MaterialData material;
+
+        material.Name =
+            objMaterial.name;
+
+        if (material.Name.empty())
+        {
+            material.Name =
+                "Material_" +
+                std::to_string(i);
+        }
+
+        if (objMaterial.diffuse_texname.empty())
+        {
+            // У этого материала нет map_Kd.
+            // Используем запасную текстуру.
+            material.DiffuseFilename =
+                fallbackTexture;
+        }
+        else
+        {
+            std::string relativePath =
+                objMaterial.diffuse_texname;
+
+            // В MTL используется '/', а Windows
+            // обычно использует '\'.
+            std::replace(
+                relativePath.begin(),
+                relativePath.end(),
+                '/',
+                '\\');
+
+            material.DiffuseFilename =
+                L"Models\\";
+
+            material.DiffuseFilename +=
+                std::wstring(
+                    relativePath.begin(),
+                    relativePath.end());
+        }
+
+        mMaterials.push_back(
+            material);
+    }
+
+    if (mMaterials.empty())
+    {
+        MaterialData defaultMaterial;
+
+        defaultMaterial.Name =
+            "DefaultMaterial";
+
+        defaultMaterial.DiffuseFilename =
+            fallbackTexture;
+
+        mMaterials.push_back(
+            defaultMaterial);
+    }
+
     DirectX::XMFLOAT3 bmin(
         +FLT_MAX,
         +FLT_MAX,
-        +FLT_MAX
-    );
+        +FLT_MAX);
 
     DirectX::XMFLOAT3 bmax(
         -FLT_MAX,
         -FLT_MAX,
-        -FLT_MAX
-    );
+        -FLT_MAX);
 
-    for (
-        size_t i = 0;
+    for (size_t i = 0;
         i + 2 < attrib.vertices.size();
         i += 3)
     {
@@ -736,151 +1249,206 @@ void BoxApp::BuildBoxGeometry()
             attrib.vertices[i + 2];
 
         bmin.x =
-            (std::min)(
-                bmin.x,
-                x
-                );
+            (std::min)(bmin.x, x);
 
         bmin.y =
-            (std::min)(
-                bmin.y,
-                y
-                );
+            (std::min)(bmin.y, y);
 
         bmin.z =
-            (std::min)(
-                bmin.z,
-                z
-                );
+            (std::min)(bmin.z, z);
 
         bmax.x =
-            (std::max)(
-                bmax.x,
-                x
-                );
+            (std::max)(bmax.x, x);
 
         bmax.y =
-            (std::max)(
-                bmax.y,
-                y
-                );
+            (std::max)(bmax.y, y);
 
         bmax.z =
-            (std::max)(
-                bmax.z,
-                z
-                );
+            (std::max)(bmax.z, z);
     }
 
     XMFLOAT3 center(
         0.5f * (bmin.x + bmax.x),
         0.5f * (bmin.y + bmax.y),
-        0.5f * (bmin.z + bmax.z)
-    );
+        0.5f * (bmin.z + bmax.z));
 
     std::vector<Vertex> vertices;
-    std::vector<std::uint32_t> indices;
+
+    // Для каждого материала будет свой список индексов.
+    std::vector<std::vector<std::uint32_t>>
+        materialIndices(
+            mMaterials.size());
 
     for (const auto& shape : shapes)
     {
-        for (const auto& idx : shape.mesh.indices)
+        size_t indexOffset = 0;
+
+        for (
+            size_t face = 0;
+            face < shape.mesh.num_face_vertices.size();
+            ++face)
         {
-            if (idx.vertex_index < 0)
+            unsigned int faceVertexCount =
+                shape.mesh.num_face_vertices[face];
+
+            int materialIndex = -1;
+
+            if (face < shape.mesh.material_ids.size())
             {
-                continue;
+                materialIndex =
+                    shape.mesh.material_ids[face];
             }
 
-            Vertex v;
-
-            const int vi =
-                3 * idx.vertex_index;
-
-            float x =
-                attrib.vertices[vi + 0];
-
-            float y =
-                attrib.vertices[vi + 1];
-
-            float z =
-                attrib.vertices[vi + 2];
-
-            v.Pos =
-                DirectX::XMFLOAT3(
-                    x - center.x,
-                    y - center.y,
-                    z - center.z
-                );
-
-            v.Normal =
-                XMFLOAT3(
-                    0.0f,
-                    1.0f,
-                    0.0f
-                );
-
-            if (idx.normal_index >= 0)
+            if (materialIndex < 0 ||
+                materialIndex >=
+                static_cast<int>(mMaterials.size()))
             {
-                const size_t ni =
-                    static_cast<size_t>(
-                        3 * idx.normal_index
-                        );
+                materialIndex = 0;
+            }
 
-                if (ni + 2 < attrib.normals.size())
+            for (
+                unsigned int vertexInFace = 0;
+                vertexInFace < faceVertexCount;
+                ++vertexInFace)
+            {
+                const tinyobj::index_t& index =
+                    shape.mesh.indices[
+                        indexOffset + vertexInFace];
+
+                if (index.vertex_index < 0)
                 {
-                    v.Normal =
-                        XMFLOAT3(
-                            attrib.normals[ni + 0],
-                            attrib.normals[ni + 1],
-                            attrib.normals[ni + 2]
-                        );
+                    continue;
                 }
-            }
 
-            v.TexC =
-                XMFLOAT2(
-                    0.0f,
-                    0.0f
-                );
+                Vertex vertex = {};
 
-            if (idx.texcoord_index >= 0)
-            {
-                const size_t ti =
+                const size_t positionIndex =
                     static_cast<size_t>(
-                        2 * idx.texcoord_index
-                        );
+                        3 * index.vertex_index);
 
-                if (ti + 1 < attrib.texcoords.size())
+                vertex.Pos =
+                    XMFLOAT3(
+                        attrib.vertices[positionIndex + 0]
+                        - center.x,
+
+                        attrib.vertices[positionIndex + 1]
+                        - center.y,
+
+                        attrib.vertices[positionIndex + 2]
+                        - center.z);
+
+                vertex.Normal =
+                    XMFLOAT3(
+                        0.0f,
+                        1.0f,
+                        0.0f);
+
+                if (index.normal_index >= 0)
                 {
-                    v.TexC =
-                        XMFLOAT2(
-                            attrib.texcoords[ti + 0],
-                            1.0f -
-                            attrib.texcoords[ti + 1]
-                        );
+                    const size_t normalIndex =
+                        static_cast<size_t>(
+                            3 * index.normal_index);
+
+                    if (normalIndex + 2 <
+                        attrib.normals.size())
+                    {
+                        vertex.Normal =
+                            XMFLOAT3(
+                                attrib.normals[
+                                    normalIndex + 0],
+
+                                    attrib.normals[
+                                        normalIndex + 1],
+
+                                        attrib.normals[
+                                            normalIndex + 2]);
+                    }
                 }
+
+                vertex.TexC =
+                    XMFLOAT2(
+                        0.0f,
+                        0.0f);
+
+                if (index.texcoord_index >= 0)
+                {
+                    const size_t texcoordIndex =
+                        static_cast<size_t>(
+                            2 * index.texcoord_index);
+
+                    if (texcoordIndex + 1 <
+                        attrib.texcoords.size())
+                    {
+                        vertex.TexC =
+                            XMFLOAT2(
+                                attrib.texcoords[
+                                    texcoordIndex + 0],
+
+                                    1.0f -
+                                    attrib.texcoords[
+                                        texcoordIndex + 1]);
+                    }
+                }
+
+                vertices.push_back(vertex);
+
+                materialIndices[
+                    materialIndex].push_back(
+                        static_cast<std::uint32_t>(
+                            vertices.size() - 1));
             }
 
-            vertices.push_back(v);
-
-            indices.push_back(
-                static_cast<std::uint32_t>(
-                    indices.size()
-                    )
-            );
+            indexOffset += faceVertexCount;
         }
+    }
+
+    std::vector<std::uint32_t> indices;
+
+    mDrawItems.clear();
+
+    for (
+        size_t materialIndex = 0;
+        materialIndex < materialIndices.size();
+        ++materialIndex)
+    {
+        if (materialIndices[materialIndex].empty())
+        {
+            continue;
+        }
+
+        MaterialDraw drawItem;
+
+        drawItem.MaterialIndex =
+            static_cast<int>(materialIndex);
+
+        drawItem.StartIndexLocation =
+            static_cast<UINT>(
+                indices.size());
+
+        drawItem.IndexCount =
+            static_cast<UINT>(
+                materialIndices[materialIndex].size());
+
+        drawItem.BaseVertexLocation = 0;
+
+        indices.insert(
+            indices.end(),
+            materialIndices[materialIndex].begin(),
+            materialIndices[materialIndex].end());
+
+        mDrawItems.push_back(
+            drawItem);
     }
 
     const UINT vbByteSize =
         static_cast<UINT>(
             vertices.size() *
-            sizeof(Vertex)
-            );
+            sizeof(Vertex));
 
     const UINT ibByteSize =
         static_cast<UINT>(
             indices.size() *
-            sizeof(std::uint32_t)
-            );
+            sizeof(std::uint32_t));
 
     mBoxGeo =
         std::make_unique<MeshGeometry>();
@@ -891,28 +1459,26 @@ void BoxApp::BuildBoxGeometry()
     ThrowIfFailed(
         D3DCreateBlob(
             vbByteSize,
-            &mBoxGeo->VertexBufferCPU
-        )
-    );
+            &mBoxGeo->VertexBufferCPU));
 
     CopyMemory(
-        mBoxGeo->VertexBufferCPU->GetBufferPointer(),
+        mBoxGeo->VertexBufferCPU
+        ->GetBufferPointer(),
+
         vertices.data(),
-        vbByteSize
-    );
+        vbByteSize);
 
     ThrowIfFailed(
         D3DCreateBlob(
             ibByteSize,
-            &mBoxGeo->IndexBufferCPU
-        )
-    );
+            &mBoxGeo->IndexBufferCPU));
 
     CopyMemory(
-        mBoxGeo->IndexBufferCPU->GetBufferPointer(),
+        mBoxGeo->IndexBufferCPU
+        ->GetBufferPointer(),
+
         indices.data(),
-        ibByteSize
-    );
+        ibByteSize);
 
     mBoxGeo->VertexBufferGPU =
         d3dUtil::CreateDefaultBuffer(
@@ -920,8 +1486,7 @@ void BoxApp::BuildBoxGeometry()
             mCommandList.Get(),
             vertices.data(),
             vbByteSize,
-            mBoxGeo->VertexBufferUploader
-        );
+            mBoxGeo->VertexBufferUploader);
 
     mBoxGeo->IndexBufferGPU =
         d3dUtil::CreateDefaultBuffer(
@@ -929,8 +1494,7 @@ void BoxApp::BuildBoxGeometry()
             mCommandList.Get(),
             indices.data(),
             ibByteSize,
-            mBoxGeo->IndexBufferUploader
-        );
+            mBoxGeo->IndexBufferUploader);
 
     mBoxGeo->VertexByteStride =
         sizeof(Vertex);
@@ -943,22 +1507,6 @@ void BoxApp::BuildBoxGeometry()
 
     mBoxGeo->IndexBufferByteSize =
         ibByteSize;
-
-    SubmeshGeometry submesh;
-
-    submesh.IndexCount =
-        static_cast<UINT>(
-            indices.size()
-            );
-
-    submesh.StartIndexLocation =
-        0;
-
-    submesh.BaseVertexLocation =
-        0;
-
-    mBoxGeo->DrawArgs["box"] =
-        submesh;
 }
 
 void BoxApp::BuildPSO()
