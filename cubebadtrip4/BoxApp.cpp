@@ -2,7 +2,8 @@
 #include "MathHelper.h"
 #include "UploadBuffer.h"
 #include <d3dx12.h>
-
+#include <memory>
+#include <utility>
 #include <algorithm>
 #include <cfloat>
 #include <cmath>
@@ -19,15 +20,12 @@
 using Microsoft::WRL::ComPtr;
 
 using namespace DirectX;
-using namespace DirectX::PackedVector;
 
 struct TgaImage
 {
     UINT Width = 0;
     UINT Height = 0;
 
-    // Пиксели будут храниться в формате RGBA:
-    // красный, зелёный, синий, прозрачность
     std::vector<std::uint8_t> Pixels;
 };
 
@@ -76,7 +74,6 @@ TgaImage LoadTgaFile(const std::wstring& filename)
             "TGA texture has invalid size.");
     }
 
-    // Мы поддерживаем обычные несжатые цветовые TGA
     if (colorMapType != 0)
     {
         throw std::runtime_error(
@@ -95,7 +92,6 @@ TgaImage LoadTgaFile(const std::wstring& filename)
             "Only 24-bit and 32-bit TGA are supported.");
     }
 
-    // Пропускаем дополнительный идентификатор файла
     file.seekg(idLength, std::ios::cur);
 
     const UINT bytesPerPixel = bitsPerPixel / 8;
@@ -128,13 +124,9 @@ TgaImage LoadTgaFile(const std::wstring& filename)
 
     image.Pixels.resize(destinationSize);
 
-    // Бит 5 показывает направление строк:
-    // 0 — изображение записано снизу вверх,
-    // 1 — сверху вниз.
     const bool topOrigin =
         (header[17] & 0x20) != 0;
 
-    // Бит 4 показывает направление столбцов
     const bool rightOrigin =
         (header[17] & 0x10) != 0;
 
@@ -158,8 +150,6 @@ TgaImage LoadTgaFile(const std::wstring& filename)
                     x) *
                 4;
 
-            // В TGA цвет хранится как BGR,
-            // а DirectX-текстура будет RGBA.
             image.Pixels[destinationIndex + 0] =
                 sourcePixels[sourceIndex + 2];
 
@@ -339,7 +329,15 @@ struct Vertex
 
 struct ObjectConstants
 {
-    XMFLOAT4X4 WorldViewProj = MathHelper::Identity4x4();
+    XMFLOAT4X4 WorldViewProj =
+        MathHelper::Identity4x4();
+
+    XMFLOAT4 TexTransform =
+        XMFLOAT4(
+            1.0f,
+            1.0f,
+            0.0f,
+            0.0f);
 };
 
 class BoxApp : public D3DApp
@@ -395,7 +393,6 @@ private:
 
     ComPtr<ID3D12PipelineState> mPSO = nullptr;
 
-    XMFLOAT4X4 mWorld = MathHelper::Identity4x4();
     XMFLOAT4X4 mView = MathHelper::Identity4x4();
     XMFLOAT4X4 mProj = MathHelper::Identity4x4();
 
@@ -403,6 +400,12 @@ private:
     float mPhi = XM_PIDIV4;
 
     float mRadius = 400.0f;
+    XMFLOAT4 mTexTransform =
+        XMFLOAT4(
+            1.0f,
+            1.0f,
+            0.0f,
+            0.0f);
 
     POINT mLastMousePos;
 };
@@ -413,7 +416,7 @@ int WINAPI WinMain(
     PSTR cmdLine,
     int showCmd)
 {
-#if defined(DEBUG) | defined(_DEBUG)
+#if defined(DEBUG) || defined(_DEBUG)
     _CrtSetDbgFlag(
         _CRTDBG_ALLOC_MEM_DF |
         _CRTDBG_LEAK_CHECK_DF
@@ -565,28 +568,20 @@ void BoxApp::Update(const GameTimer& gt)
         view
     );
 
-    XMMATRIX world =
-        XMLoadFloat4x4(&mWorld);
+    const float tiling = 1.0f;
+    const float scrollSpeed = 0.02f;
 
-    XMMATRIX proj =
-        XMLoadFloat4x4(&mProj);
+    const float scrollX =
+        fmodf(
+            gt.TotalTime() * scrollSpeed,
+            1.0f);
 
-    XMMATRIX worldViewProj =
-        world *
-        view *
-        proj;
-
-    ObjectConstants objConstants;
-
-    XMStoreFloat4x4(
-        &objConstants.WorldViewProj,
-        XMMatrixTranspose(worldViewProj)
-    );
-
-    mObjectCB->CopyData(
-        0,
-        objConstants
-    );
+    mTexTransform =
+        XMFLOAT4(
+            tiling,
+            tiling,
+            scrollX,
+            0.0f);
 }
 
 void BoxApp::Draw(const GameTimer& gt)
@@ -695,6 +690,9 @@ void BoxApp::Draw(const GameTimer& gt)
         &objConstants.WorldViewProj,
         XMMatrixTranspose(worldViewProj)
     );
+
+    objConstants.TexTransform =
+        mTexTransform;
 
     mObjectCB->CopyData(
         0,
@@ -999,8 +997,6 @@ void BoxApp::BuildConstantBuffers()
             mCbvHeap
             ->GetCPUDescriptorHandleForHeapStart());
 
-        // Нулевой элемент занят CBV,
-        // поэтому первая текстура начинается с 1.
         srvHandle.Offset(
             static_cast<INT>(textureIndex + 1),
             mCbvSrvUavDescriptorSize);
@@ -1180,8 +1176,7 @@ void BoxApp::BuildBoxGeometry()
 
         if (objMaterial.diffuse_texname.empty())
         {
-            // У этого материала нет map_Kd.
-            // Используем запасную текстуру.
+            
             material.DiffuseFilename =
                 fallbackTexture;
         }
@@ -1190,8 +1185,7 @@ void BoxApp::BuildBoxGeometry()
             std::string relativePath =
                 objMaterial.diffuse_texname;
 
-            // В MTL используется '/', а Windows
-            // обычно использует '\'.
+           
             std::replace(
                 relativePath.begin(),
                 relativePath.end(),
@@ -1274,7 +1268,6 @@ void BoxApp::BuildBoxGeometry()
 
     std::vector<Vertex> vertices;
 
-    // Для каждого материала будет свой список индексов.
     std::vector<std::vector<std::uint32_t>>
         materialIndices(
             mMaterials.size());

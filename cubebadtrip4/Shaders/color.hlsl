@@ -1,6 +1,8 @@
 cbuffer cbPerObject : register(b0)
 {
     float4x4 gWorldViewProj;
+
+    float4 gTexTransform;
 };
 
 Texture2D gDiffuseMap : register(t0);
@@ -9,9 +11,9 @@ SamplerState gsamLinear : register(s0);
 
 struct VertexIn
 {
-    float3 Pos    : POSITION;
-    float3 Normal : NORMAL;
-    float2 TexC   : TEXCOORD;
+    float3 PosL    : POSITION;
+    float3 NormalL : NORMAL;
+    float2 TexC    : TEXCOORD;
 };
 
 struct VertexOut
@@ -24,11 +26,14 @@ VertexOut VS(VertexIn vin)
 {
     VertexOut vout;
 
-    vout.PosH = mul(
-        float4(vin.Pos, 1.0f),
-        gWorldViewProj);
+    vout.PosH =
+        mul(
+            float4(vin.PosL, 1.0f),
+            gWorldViewProj);
 
-    vout.TexC = vin.TexC;
+    vout.TexC =
+        vin.TexC * gTexTransform.xy
+        + gTexTransform.zw;
 
     return vout;
 }
