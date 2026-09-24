@@ -68,7 +68,8 @@ Ni 1.000000
 d 0.000000
 illum 2
 map_Kd textures/spnza_bricks_a_diff.tga
-map_Disp textures/spnza_bricks_a_ddn.tga
+map_Bump textures/spnza_bricks_normal.tga
+map_Disp textures/spnza_bricks_height.tga
 map_Ka textures/spnza_bricks_a_diff.tga
 
 newmtl ceiling

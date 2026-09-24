@@ -1,6 +1,5 @@
 #include "d3dApp.h"
 #include "MathHelper.h"
-#include "RenderingSystem.h"
 #include "UploadBuffer.h"
 #include <d3dx12.h>
 #include <memory>
@@ -303,10 +302,38 @@ void CreateTextureFromTga(
         &textureBarrier);
 }
 
+std::wstring MakeModelTexturePath(
+    const std::string& relativePath,
+    const std::wstring& fallback)
+{
+    if (relativePath.empty())
+    {
+        return fallback;
+    }
+
+    std::string normalizedPath = relativePath;
+
+    std::replace(
+        normalizedPath.begin(),
+        normalizedPath.end(),
+        '/',
+        '\\');
+
+    std::wstring result = L"Models\\";
+
+    result += std::wstring(
+        normalizedPath.begin(),
+        normalizedPath.end());
+
+    return result;
+}
+
 struct MaterialData
 {
     std::string Name;
     std::wstring DiffuseFilename;
+    std::wstring NormalFilename;
+    std::wstring DisplacementFilename;
 };
 
 struct MaterialDraw
@@ -329,11 +356,22 @@ struct Vertex
 
 struct ObjectConstants
 {
+    XMFLOAT4X4 WorldViewProj =
+        MathHelper::Identity4x4();
+
+    XMFLOAT4X4 ViewProj =
+        MathHelper::Identity4x4();
+
     XMFLOAT4X4 World =
         MathHelper::Identity4x4();
 
-    XMFLOAT4X4 WorldViewProj =
-        MathHelper::Identity4x4();
+    XMFLOAT3 EyePosW =
+        XMFLOAT3(0.0f, 0.0f, 0.0f);
+
+    float DisplacementScale = 0.5f;
+
+    XMFLOAT4 TessParams =
+        XMFLOAT4(80.0f, 700.0f, 1.0f, 16.0f);
 
     XMFLOAT4 TexTransform =
         XMFLOAT4(
@@ -390,15 +428,19 @@ private:
     UINT mCbvSrvUavDescriptorSize = 0;
 
     ComPtr<ID3DBlob> mvsByteCode = nullptr;
+    ComPtr<ID3DBlob> mhsByteCode = nullptr;
+    ComPtr<ID3DBlob> mdsByteCode = nullptr;
     ComPtr<ID3DBlob> mpsByteCode = nullptr;
 
     std::vector<D3D12_INPUT_ELEMENT_DESC> mInputLayout;
 
-    ComPtr<ID3D12PipelineState> mGeometryPSO = nullptr;
-    RenderingSystem mRenderingSystem;
+    ComPtr<ID3D12PipelineState> mPSO = nullptr;
 
     XMFLOAT4X4 mView = MathHelper::Identity4x4();
     XMFLOAT4X4 mProj = MathHelper::Identity4x4();
+
+    XMFLOAT3 mEyePos =
+        XMFLOAT3(0.0f, 0.0f, 0.0f);
 
     float mTheta = 1.5f * XM_PI;
     float mPhi = XM_PIDIV4;
@@ -493,15 +535,6 @@ bool BoxApp::Initialize()
     BuildShadersAndInputLayout();
     BuildPSO();
 
-    if (!mRenderingSystem.Initialize(
-        md3dDevice.Get(),
-        static_cast<UINT>(mClientWidth),
-        static_cast<UINT>(mClientHeight),
-        mBackBufferFormat))
-    {
-        return false;
-    }
-
     ThrowIfFailed(mCommandList->Close());
 
     ID3D12CommandList* cmdsLists[] =
@@ -522,13 +555,6 @@ bool BoxApp::Initialize()
 void BoxApp::OnResize()
 {
     D3DApp::OnResize();
-
-    if (mRenderingSystem.IsInitialized())
-    {
-        mRenderingSystem.Resize(
-            static_cast<UINT>(mClientWidth),
-            static_cast<UINT>(mClientHeight));
-    }
 
     XMMATRIX P =
         XMMatrixPerspectiveFovLH(
@@ -565,6 +591,10 @@ void BoxApp::Update(const GameTimer& gt)
             1.0f
         );
 
+    XMStoreFloat3(
+        &mEyePos,
+        pos);
+
     XMVECTOR target =
         XMVectorZero();
 
@@ -588,87 +618,202 @@ void BoxApp::Update(const GameTimer& gt)
         view
     );
 
-    const float tiling = 1.0f;
-    const float scrollSpeed = 0.02f;
-
-    const float scrollX =
-        fmodf(
-            gt.TotalTime() * scrollSpeed,
-            1.0f);
-
     mTexTransform =
         XMFLOAT4(
-            tiling,
-            tiling,
-            scrollX,
+            1.0f,
+            1.0f,
+            0.0f,
             0.0f);
 }
 
 void BoxApp::Draw(const GameTimer& gt)
 {
-    ThrowIfFailed(mDirectCmdListAlloc->Reset());
+    ThrowIfFailed(
+        mDirectCmdListAlloc->Reset()
+    );
 
-    ThrowIfFailed(mCommandList->Reset(
-        mDirectCmdListAlloc.Get(),
-        mGeometryPSO.Get()));
+    ThrowIfFailed(
+        mCommandList->Reset(
+            mDirectCmdListAlloc.Get(),
+            mPSO.Get()
+        )
+    );
 
-    mCommandList->RSSetViewports(1, &mScreenViewport);
-    mCommandList->RSSetScissorRects(1, &mScissorRect);
+    mCommandList->RSSetViewports(
+        1,
+        &mScreenViewport
+    );
 
-    mRenderingSystem.BeginGeometryPass(
-        mCommandList.Get(),
-        DepthStencilView());
+    mCommandList->RSSetScissorRects(
+        1,
+        &mScissorRect
+    );
 
-    mCommandList->SetPipelineState(mGeometryPSO.Get());
+    auto transition =
+        CD3DX12_RESOURCE_BARRIER::Transition(
+            CurrentBackBuffer(),
+            D3D12_RESOURCE_STATE_PRESENT,
+            D3D12_RESOURCE_STATE_RENDER_TARGET
+        );
+
+    mCommandList->ResourceBarrier(
+        1,
+        &transition
+    );
+
+    mCommandList->ClearRenderTargetView(
+        CurrentBackBufferView(),
+        Colors::LightSteelBlue,
+        0,
+        nullptr
+    );
+
+    mCommandList->ClearDepthStencilView(
+        DepthStencilView(),
+        D3D12_CLEAR_FLAG_DEPTH |
+        D3D12_CLEAR_FLAG_STENCIL,
+        1.0f,
+        0,
+        0,
+        nullptr
+    );
+
+    auto cbbv =
+        CurrentBackBufferView();
+
+    auto dsv =
+        DepthStencilView();
+
+    mCommandList->OMSetRenderTargets(
+        1,
+        &cbbv,
+        true,
+        &dsv
+    );
 
     ID3D12DescriptorHeap* descriptorHeaps[] =
     {
         mCbvHeap.Get()
     };
+
     mCommandList->SetDescriptorHeaps(
         _countof(descriptorHeaps),
-        descriptorHeaps);
+        descriptorHeaps
+    );
 
-    mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
+    mCommandList->SetGraphicsRootSignature(
+        mRootSignature.Get()
+    );
 
-    const XMMATRIX world = XMMatrixTranslation(0.0f, 50.0f, 0.0f);
-    const XMMATRIX view = XMLoadFloat4x4(&mView);
-    const XMMATRIX proj = XMLoadFloat4x4(&mProj);
-    const XMMATRIX worldViewProj = world * view * proj;
+    XMMATRIX translate =
+        XMMatrixTranslation(
+            0.0f,
+            50.0f,
+            0.0f
+        );
+
+    XMMATRIX world =
+        translate;
+
+    XMMATRIX view =
+        XMLoadFloat4x4(&mView);
+
+    XMMATRIX proj =
+        XMLoadFloat4x4(&mProj);
+
+    XMMATRIX worldViewProj =
+        world *
+        view *
+        proj;
 
     ObjectConstants objConstants;
-    XMStoreFloat4x4(&objConstants.World, XMMatrixTranspose(world));
+
     XMStoreFloat4x4(
         &objConstants.WorldViewProj,
-        XMMatrixTranspose(worldViewProj));
-    objConstants.TexTransform = mTexTransform;
-    mObjectCB->CopyData(0, objConstants);
+        XMMatrixTranspose(worldViewProj)
+    );
 
-    const auto vbv = mBoxGeo->VertexBufferView();
-    const auto ibv = mBoxGeo->IndexBufferView();
-    mCommandList->IASetVertexBuffers(0, 1, &vbv);
-    mCommandList->IASetIndexBuffer(&ibv);
+    XMStoreFloat4x4(
+        &objConstants.World,
+        XMMatrixTranspose(world)
+    );
+
+    XMStoreFloat4x4(
+        &objConstants.ViewProj,
+        XMMatrixTranspose(view * proj)
+    );
+
+    objConstants.EyePosW = mEyePos;
+    objConstants.DisplacementScale = 2.0f;
+    objConstants.TessParams =
+        XMFLOAT4(
+            80.0f,
+            700.0f,
+            1.0f,
+            16.0f);
+
+    objConstants.TexTransform =
+        mTexTransform;
+
+    mObjectCB->CopyData(
+        0,
+        objConstants
+    );
+
+    auto vbv =
+        mBoxGeo->VertexBufferView();
+
+    auto ibv =
+        mBoxGeo->IndexBufferView();
+
+    mCommandList->IASetVertexBuffers(
+        0,
+        1,
+        &vbv
+    );
+
+    mCommandList->IASetIndexBuffer(
+        &ibv
+    );
+
     mCommandList->IASetPrimitiveTopology(
-        D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        D3D_PRIMITIVE_TOPOLOGY_3_CONTROL_POINT_PATCHLIST
+    );
 
     CD3DX12_GPU_DESCRIPTOR_HANDLE cbvHandle(
-        mCbvHeap->GetGPUDescriptorHandleForHeapStart());
-    mCommandList->SetGraphicsRootDescriptorTable(0, cbvHandle);
+        mCbvHeap
+        ->GetGPUDescriptorHandleForHeapStart());
+
+    mCommandList->SetGraphicsRootDescriptorTable(
+        0,
+        cbvHandle);
 
     for (const MaterialDraw& drawItem : mDrawItems)
     {
-        if (drawItem.MaterialIndex < 0 ||
-            static_cast<size_t>(drawItem.MaterialIndex) >= mTextures.size())
+        if (drawItem.MaterialIndex < 0)
+        {
+            continue;
+        }
+
+        if (
+            static_cast<size_t>(
+                drawItem.MaterialIndex)
+            >= mMaterials.size())
         {
             continue;
         }
 
         CD3DX12_GPU_DESCRIPTOR_HANDLE srvHandle(
-            mCbvHeap->GetGPUDescriptorHandleForHeapStart());
+            mCbvHeap
+            ->GetGPUDescriptorHandleForHeapStart());
+
         srvHandle.Offset(
-            drawItem.MaterialIndex + 1,
+            1 + drawItem.MaterialIndex * 3,
             mCbvSrvUavDescriptorSize);
-        mCommandList->SetGraphicsRootDescriptorTable(1, srvHandle);
+
+        mCommandList->SetGraphicsRootDescriptorTable(
+            1,
+            srvHandle);
 
         mCommandList->DrawIndexedInstanced(
             drawItem.IndexCount,
@@ -678,27 +823,42 @@ void BoxApp::Draw(const GameTimer& gt)
             0);
     }
 
-    mRenderingSystem.RenderLighting(
-        mCommandList.Get(),
-        CurrentBackBuffer(),
-        CurrentBackBufferView(),
-        mScreenViewport,
-        mScissorRect);
+    transition =
+        CD3DX12_RESOURCE_BARRIER::Transition(
+            CurrentBackBuffer(),
+            D3D12_RESOURCE_STATE_RENDER_TARGET,
+            D3D12_RESOURCE_STATE_PRESENT
+        );
 
-    ThrowIfFailed(mCommandList->Close());
+    mCommandList->ResourceBarrier(
+        1,
+        &transition
+    );
 
-    ID3D12CommandList* commandLists[] =
+    ThrowIfFailed(
+        mCommandList->Close()
+    );
+
+    ID3D12CommandList* cmdsLists[] =
     {
         mCommandList.Get()
     };
-    mCommandQueue->ExecuteCommandLists(
-        _countof(commandLists),
-        commandLists);
 
-    ThrowIfFailed(mSwapChain->Present(0, 0));
+    mCommandQueue->ExecuteCommandLists(
+        _countof(cmdsLists),
+        cmdsLists
+    );
+
+    ThrowIfFailed(
+        mSwapChain->Present(
+            0,
+            0
+        )
+    );
 
     mCurrBackBuffer =
-        (mCurrBackBuffer + 1) % SwapChainBufferCount;
+        (mCurrBackBuffer + 1) %
+        SwapChainBufferCount;
 
     FlushCommandQueue();
 }
@@ -789,22 +949,43 @@ void BoxApp::BuildTexture()
 
     for (const MaterialData& material : mMaterials)
     {
-        auto texture =
-            std::make_unique<Texture>();
+        const std::wstring filenames[] =
+        {
+            material.DiffuseFilename,
+            material.NormalFilename,
+            material.DisplacementFilename
+        };
 
-        texture->Name =
-            "Sponza_" + material.Name;
+        const char* names[] =
+        {
+            "_Diffuse",
+            "_Normal",
+            "_Displacement"
+        };
 
-        texture->Filename =
-            material.DiffuseFilename;
+        for (int textureIndex = 0;
+            textureIndex < 3;
+            ++textureIndex)
+        {
+            auto texture =
+                std::make_unique<Texture>();
 
-        CreateTextureFromTga(
-            md3dDevice.Get(),
-            mCommandList.Get(),
-            *texture);
+            texture->Name =
+                "Sponza_" +
+                material.Name +
+                names[textureIndex];
 
-        mTextures.push_back(
-            std::move(texture));
+            texture->Filename =
+                filenames[textureIndex];
+
+            CreateTextureFromTga(
+                md3dDevice.Get(),
+                mCommandList.Get(),
+                *texture);
+
+            mTextures.push_back(
+                std::move(texture));
+        }
     }
 }
 
@@ -927,7 +1108,7 @@ void BoxApp::BuildRootSignature()
 
     srvTable.Init(
         D3D12_DESCRIPTOR_RANGE_TYPE_SRV,
-        1,
+        3,
         0);
 
     slotRootParameter[0].InitAsDescriptorTable(
@@ -982,14 +1163,28 @@ void BoxApp::BuildShadersAndInputLayout()
 {
     mvsByteCode =
         d3dUtil::CompileShader(
-            L"Shaders\\GeometryGBuffer.hlsl",
+            L"Shaders\\tessellation.hlsl",
             nullptr,
             "VS",
             "vs_5_0");
 
+    mhsByteCode =
+        d3dUtil::CompileShader(
+            L"Shaders\\tessellation.hlsl",
+            nullptr,
+            "HS",
+            "hs_5_0");
+
+    mdsByteCode =
+        d3dUtil::CompileShader(
+            L"Shaders\\tessellation.hlsl",
+            nullptr,
+            "DS",
+            "ds_5_0");
+
     mpsByteCode =
         d3dUtil::CompileShader(
-            L"Shaders\\GeometryGBuffer.hlsl",
+            L"Shaders\\tessellation.hlsl",
             nullptr,
             "PS",
             "ps_5_0");
@@ -1058,6 +1253,9 @@ void BoxApp::BuildBoxGeometry()
     const std::wstring fallbackTexture =
         L"Models\\textures\\sponza_arch_diff.tga";
 
+    const std::wstring fallbackNormal =
+        L"Models\\textures\\sponza_arch_ddn.tga";
+
     for (size_t i = 0; i < objMaterials.size(); ++i)
     {
         const tinyobj::material_t& objMaterial =
@@ -1075,32 +1273,29 @@ void BoxApp::BuildBoxGeometry()
                 std::to_string(i);
         }
 
-        if (objMaterial.diffuse_texname.empty())
+        material.DiffuseFilename =
+            MakeModelTexturePath(
+                objMaterial.diffuse_texname,
+                fallbackTexture);
+
+        std::string normalTextureName =
+            objMaterial.normal_texname;
+
+        if (normalTextureName.empty())
         {
-
-            material.DiffuseFilename =
-                fallbackTexture;
+            normalTextureName =
+                objMaterial.bump_texname;
         }
-        else
-        {
-            std::string relativePath =
-                objMaterial.diffuse_texname;
 
+        material.NormalFilename =
+            MakeModelTexturePath(
+                normalTextureName,
+                fallbackNormal);
 
-            std::replace(
-                relativePath.begin(),
-                relativePath.end(),
-                '/',
-                '\\');
-
-            material.DiffuseFilename =
-                L"Models\\";
-
-            material.DiffuseFilename +=
-                std::wstring(
-                    relativePath.begin(),
-                    relativePath.end());
-        }
+        material.DisplacementFilename =
+            MakeModelTexturePath(
+                objMaterial.displacement_texname,
+                material.NormalFilename);
 
         mMaterials.push_back(
             material);
@@ -1115,6 +1310,12 @@ void BoxApp::BuildBoxGeometry()
 
         defaultMaterial.DiffuseFilename =
             fallbackTexture;
+
+        defaultMaterial.NormalFilename =
+            fallbackNormal;
+
+        defaultMaterial.DisplacementFilename =
+            fallbackNormal;
 
         mMaterials.push_back(
             defaultMaterial);
@@ -1433,6 +1634,22 @@ void BoxApp::BuildPSO()
         mvsByteCode->GetBufferSize()
     };
 
+    psoDesc.HS =
+    {
+        reinterpret_cast<BYTE*>(
+            mhsByteCode->GetBufferPointer()
+        ),
+        mhsByteCode->GetBufferSize()
+    };
+
+    psoDesc.DS =
+    {
+        reinterpret_cast<BYTE*>(
+            mdsByteCode->GetBufferPointer()
+        ),
+        mdsByteCode->GetBufferSize()
+    };
+
     psoDesc.PS =
     {
         reinterpret_cast<BYTE*>(
@@ -1442,9 +1659,7 @@ void BoxApp::BuildPSO()
     };
 
     psoDesc.RasterizerState =
-        CD3DX12_RASTERIZER_DESC(
-            D3D12_DEFAULT
-        );
+        CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 
     psoDesc.BlendState =
         CD3DX12_BLEND_DESC(
@@ -1460,15 +1675,21 @@ void BoxApp::BuildPSO()
         UINT_MAX;
 
     psoDesc.PrimitiveTopologyType =
-        D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH;
 
-    psoDesc.NumRenderTargets = 3;
-    psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-    psoDesc.RTVFormats[1] = DXGI_FORMAT_R16G16B16A16_FLOAT;
-    psoDesc.RTVFormats[2] = DXGI_FORMAT_R32G32B32A32_FLOAT;
+    psoDesc.NumRenderTargets =
+        1;
 
-    psoDesc.SampleDesc.Count = 1;
-    psoDesc.SampleDesc.Quality = 0;
+    psoDesc.RTVFormats[0] =
+        mBackBufferFormat;
+
+    psoDesc.SampleDesc.Count =
+        m4xMsaaState ? 4 : 1;
+
+    psoDesc.SampleDesc.Quality =
+        m4xMsaaState
+        ? m4xMsaaQuality - 1
+        : 0;
 
     psoDesc.DSVFormat =
         mDepthStencilFormat;
@@ -1476,7 +1697,7 @@ void BoxApp::BuildPSO()
     ThrowIfFailed(
         md3dDevice->CreateGraphicsPipelineState(
             &psoDesc,
-            IID_PPV_ARGS(&mGeometryPSO)
+            IID_PPV_ARGS(&mPSO)
         )
     );
 }
