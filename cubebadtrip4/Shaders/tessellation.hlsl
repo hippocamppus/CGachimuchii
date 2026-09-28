@@ -231,3 +231,34 @@ color =
 
 return float4(color, baseColor.a);
 }
+
+// A geometry shader passes the tessellated triangles to Stream Output.
+[maxvertexcount(3)]
+void CaptureGS(
+    triangle DomainOut input[3],
+    inout TriangleStream<DomainOut> output)
+{
+    output.Append(input[0]);
+    output.Append(input[1]);
+    output.Append(input[2]);
+    output.RestartStrip();
+}
+
+struct CachedVertexIn
+{
+    float3 PosW : POSITION1;
+    float3 NormalW : NORMAL;
+    float2 TexC : TEXCOORD;
+};
+
+// Every frame we still transform world positions with the latest camera.
+// No tessellation stages are bound to this rendering pipeline.
+DomainOut CachedVS(CachedVertexIn vin)
+{
+    DomainOut output;
+    output.PosW = vin.PosW;
+    output.NormalW = vin.NormalW;
+    output.TexC = vin.TexC;
+    output.PosH = mul(float4(vin.PosW, 1.0f), gViewProj);
+    return output;
+}

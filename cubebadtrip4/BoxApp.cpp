@@ -295,7 +295,9 @@ void CreateTextureFromTga(
         CD3DX12_RESOURCE_BARRIER::Transition(
             texture.Resource.Get(),
             D3D12_RESOURCE_STATE_COPY_DEST,
-            D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+            static_cast<D3D12_RESOURCE_STATES>(
+                D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
+                D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
 
     commandList->ResourceBarrier(
         1,
@@ -354,6 +356,9 @@ struct Vertex
     XMFLOAT2 TexC;
 };
 
+static_assert(sizeof(Vertex) == 32,
+    "The Stream Output layout must be 32 bytes per vertex.");
+
 struct ObjectConstants
 {
     XMFLOAT4X4 WorldViewProj =
@@ -409,6 +414,20 @@ private:
     void BuildShadersAndInputLayout();
     void BuildBoxGeometry();
     void BuildPSO();
+    void InitializeCacheResources();
+    void UpdateObjectConstants();
+    void RebuildCachedMesh();
+
+    struct CachedMaterial
+    {
+        ComPtr<ID3D12Resource> VertexBuffer;
+        ComPtr<ID3D12Resource> FilledSize;
+        UINT64 CapacityBytes = 0;
+        UINT VertexCount = 0;
+        bool IsVertexBufferState = false;
+    };
+
+    void ResizeCachedMaterial(CachedMaterial& item, UINT64 bytes);
 
 private:
     ComPtr<ID3D12RootSignature> mRootSignature = nullptr;
@@ -431,10 +450,23 @@ private:
     ComPtr<ID3DBlob> mhsByteCode = nullptr;
     ComPtr<ID3DBlob> mdsByteCode = nullptr;
     ComPtr<ID3DBlob> mpsByteCode = nullptr;
+    ComPtr<ID3DBlob> mCaptureGsByteCode = nullptr;
+    ComPtr<ID3DBlob> mCachedVsByteCode = nullptr;
 
     std::vector<D3D12_INPUT_ELEMENT_DESC> mInputLayout;
 
-    ComPtr<ID3D12PipelineState> mPSO = nullptr;
+    ComPtr<ID3D12PipelineState> mCapturePSO = nullptr;
+    ComPtr<ID3D12PipelineState> mCachedPSO = nullptr;
+
+    std::vector<CachedMaterial> mCachedMaterials;
+    ComPtr<ID3D12Resource> mZeroFilledSizeUpload = nullptr;
+    ComPtr<ID3D12QueryHeap> mStreamOutputQueries = nullptr;
+    ComPtr<ID3D12Resource> mQueryReadback = nullptr;
+    bool mFilledSizesAreStreamOut = false;
+    bool mCacheReady = false;
+    static constexpr std::uint64_t TessellationFrameInterval = 50;
+    static_assert(TessellationFrameInterval > 0, "The frame interval must be positive.");
+    std::uint64_t mFrameIndex = 0;
 
     XMFLOAT4X4 mView = MathHelper::Identity4x4();
     XMFLOAT4X4 mProj = MathHelper::Identity4x4();
@@ -534,6 +566,7 @@ bool BoxApp::Initialize()
     BuildRootSignature();
     BuildShadersAndInputLayout();
     BuildPSO();
+    InitializeCacheResources();
 
     ThrowIfFailed(mCommandList->Close());
 
@@ -626,8 +659,74 @@ void BoxApp::Update(const GameTimer& gt)
             0.0f);
 }
 
+void BoxApp::UpdateObjectConstants()
+{
+    XMMATRIX translate =
+        XMMatrixTranslation(
+            0.0f,
+            50.0f,
+            0.0f
+        );
+
+    XMMATRIX world =
+        translate;
+
+    XMMATRIX view =
+        XMLoadFloat4x4(&mView);
+
+    XMMATRIX proj =
+        XMLoadFloat4x4(&mProj);
+
+    XMMATRIX worldViewProj =
+        world *
+        view *
+        proj;
+
+    ObjectConstants objConstants;
+
+    XMStoreFloat4x4(
+        &objConstants.WorldViewProj,
+        XMMatrixTranspose(worldViewProj)
+    );
+
+    XMStoreFloat4x4(
+        &objConstants.World,
+        XMMatrixTranspose(world)
+    );
+
+    XMStoreFloat4x4(
+        &objConstants.ViewProj,
+        XMMatrixTranspose(view * proj)
+    );
+
+    objConstants.EyePosW = mEyePos;
+    objConstants.DisplacementScale = 2.0f;
+    objConstants.TessParams =
+        XMFLOAT4(
+            80.0f,
+            700.0f,
+            1.0f,
+            16.0f);
+
+    objConstants.TexTransform =
+        mTexTransform;
+
+    mObjectCB->CopyData(
+        0,
+        objConstants
+    );
+}
+
 void BoxApp::Draw(const GameTimer& gt)
 {
+    // The cache is built on frames 0, 50, 100, ...
+    UpdateObjectConstants();
+
+    if (!mCacheReady || mFrameIndex % TessellationFrameInterval == 0)
+    {
+        RebuildCachedMesh();
+    }
+
     ThrowIfFailed(
         mDirectCmdListAlloc->Reset()
     );
@@ -635,7 +734,7 @@ void BoxApp::Draw(const GameTimer& gt)
     ThrowIfFailed(
         mCommandList->Reset(
             mDirectCmdListAlloc.Get(),
-            mPSO.Get()
+            mCachedPSO.Get()
         )
     );
 
@@ -705,80 +804,8 @@ void BoxApp::Draw(const GameTimer& gt)
         mRootSignature.Get()
     );
 
-    XMMATRIX translate =
-        XMMatrixTranslation(
-            0.0f,
-            50.0f,
-            0.0f
-        );
-
-    XMMATRIX world =
-        translate;
-
-    XMMATRIX view =
-        XMLoadFloat4x4(&mView);
-
-    XMMATRIX proj =
-        XMLoadFloat4x4(&mProj);
-
-    XMMATRIX worldViewProj =
-        world *
-        view *
-        proj;
-
-    ObjectConstants objConstants;
-
-    XMStoreFloat4x4(
-        &objConstants.WorldViewProj,
-        XMMatrixTranspose(worldViewProj)
-    );
-
-    XMStoreFloat4x4(
-        &objConstants.World,
-        XMMatrixTranspose(world)
-    );
-
-    XMStoreFloat4x4(
-        &objConstants.ViewProj,
-        XMMatrixTranspose(view * proj)
-    );
-
-    objConstants.EyePosW = mEyePos;
-    objConstants.DisplacementScale = 2.0f;
-    objConstants.TessParams =
-        XMFLOAT4(
-            80.0f,
-            700.0f,
-            1.0f,
-            16.0f);
-
-    objConstants.TexTransform =
-        mTexTransform;
-
-    mObjectCB->CopyData(
-        0,
-        objConstants
-    );
-
-    auto vbv =
-        mBoxGeo->VertexBufferView();
-
-    auto ibv =
-        mBoxGeo->IndexBufferView();
-
-    mCommandList->IASetVertexBuffers(
-        0,
-        1,
-        &vbv
-    );
-
-    mCommandList->IASetIndexBuffer(
-        &ibv
-    );
-
     mCommandList->IASetPrimitiveTopology(
-        D3D_PRIMITIVE_TOPOLOGY_3_CONTROL_POINT_PATCHLIST
-    );
+        D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     CD3DX12_GPU_DESCRIPTOR_HANDLE cbvHandle(
         mCbvHeap
@@ -788,39 +815,35 @@ void BoxApp::Draw(const GameTimer& gt)
         0,
         cbvHandle);
 
-    for (const MaterialDraw& drawItem : mDrawItems)
+    for (size_t i = 0; i < mDrawItems.size(); ++i)
     {
-        if (drawItem.MaterialIndex < 0)
+        const MaterialDraw& drawItem = mDrawItems[i];
+        const CachedMaterial& cached = mCachedMaterials[i];
+
+        if (cached.VertexCount == 0 ||
+            drawItem.MaterialIndex < 0 ||
+            static_cast<size_t>(drawItem.MaterialIndex) >= mMaterials.size())
         {
             continue;
         }
 
-        if (
-            static_cast<size_t>(
-                drawItem.MaterialIndex)
-            >= mMaterials.size())
-        {
-            continue;
-        }
+        D3D12_VERTEX_BUFFER_VIEW cachedView = {};
+        cachedView.BufferLocation =
+            cached.VertexBuffer->GetGPUVirtualAddress();
+        cachedView.SizeInBytes =
+            cached.VertexCount * static_cast<UINT>(sizeof(Vertex));
+        cachedView.StrideInBytes = sizeof(Vertex);
+
+        mCommandList->IASetVertexBuffers(0, 1, &cachedView);
 
         CD3DX12_GPU_DESCRIPTOR_HANDLE srvHandle(
-            mCbvHeap
-            ->GetGPUDescriptorHandleForHeapStart());
-
+            mCbvHeap->GetGPUDescriptorHandleForHeapStart());
         srvHandle.Offset(
             1 + drawItem.MaterialIndex * 3,
             mCbvSrvUavDescriptorSize);
 
-        mCommandList->SetGraphicsRootDescriptorTable(
-            1,
-            srvHandle);
-
-        mCommandList->DrawIndexedInstanced(
-            drawItem.IndexCount,
-            1,
-            drawItem.StartIndexLocation,
-            drawItem.BaseVertexLocation,
-            0);
+        mCommandList->SetGraphicsRootDescriptorTable(1, srvHandle);
+        mCommandList->DrawInstanced(cached.VertexCount, 1, 0, 0);
     }
 
     transition =
@@ -861,6 +884,7 @@ void BoxApp::Draw(const GameTimer& gt)
         SwapChainBufferCount;
 
     FlushCommandQueue();
+    ++mFrameIndex;
 }
 
 void BoxApp::OnMouseDown(
@@ -918,13 +942,13 @@ void BoxApp::OnMouseMove(
     else if ((btnState & MK_RBUTTON) != 0)
     {
         float dx =
-            0.005f *
+            0.5f *
             static_cast<float>(
                 x - mLastMousePos.x
                 );
 
         float dy =
-            0.005f *
+            0.5f *
             static_cast<float>(
                 y - mLastMousePos.y
                 );
@@ -1131,7 +1155,9 @@ void BoxApp::BuildRootSignature()
         slotRootParameter,
         1,
         &sampler,
-        D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+        static_cast<D3D12_ROOT_SIGNATURE_FLAGS>(
+            D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
+            D3D12_ROOT_SIGNATURE_FLAG_ALLOW_STREAM_OUTPUT));
 
     ComPtr<ID3DBlob> serializedRootSig = nullptr;
     ComPtr<ID3DBlob> errorBlob = nullptr;
@@ -1188,6 +1214,20 @@ void BoxApp::BuildShadersAndInputLayout()
             nullptr,
             "PS",
             "ps_5_0");
+
+    mCaptureGsByteCode =
+        d3dUtil::CompileShader(
+            L"Shaders\\tessellation.hlsl",
+            nullptr,
+            "CaptureGS",
+            "gs_5_0");
+
+    mCachedVsByteCode =
+        d3dUtil::CompileShader(
+            L"Shaders\\tessellation.hlsl",
+            nullptr,
+            "CachedVS",
+            "vs_5_0");
 
     mInputLayout =
     {
@@ -1694,10 +1734,367 @@ void BoxApp::BuildPSO()
     psoDesc.DSVFormat =
         mDepthStencilFormat;
 
+    // Each captured vertex is {world position, world normal, UV}: 32 bytes.
+    D3D12_SO_DECLARATION_ENTRY soEntries[] =
+    {
+        {0, "POSITION", 1, 0, 3, 0},
+        {0, "NORMAL", 0, 0, 3, 0},
+        {0, "TEXCOORD", 0, 0, 2, 0}
+    };
+    UINT soStride = sizeof(Vertex);
+
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC captureDesc = psoDesc;
+    captureDesc.GS =
+    {
+        reinterpret_cast<BYTE*>(mCaptureGsByteCode->GetBufferPointer()),
+        mCaptureGsByteCode->GetBufferSize()
+    };
+    captureDesc.PS = {};
+    captureDesc.StreamOutput =
+    {
+        soEntries, _countof(soEntries),
+        &soStride, 1,
+        D3D12_SO_NO_RASTERIZED_STREAM
+    };
+    captureDesc.NumRenderTargets = 0;
+    captureDesc.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
+    captureDesc.DSVFormat = DXGI_FORMAT_UNKNOWN;
+    captureDesc.DepthStencilState.DepthEnable = FALSE;
+    captureDesc.DepthStencilState.StencilEnable = FALSE;
+    captureDesc.SampleDesc.Count = 1;
+    captureDesc.SampleDesc.Quality = 0;
+
     ThrowIfFailed(
         md3dDevice->CreateGraphicsPipelineState(
-            &psoDesc,
-            IID_PPV_ARGS(&mPSO)
-        )
-    );
+            &captureDesc,
+            IID_PPV_ARGS(&mCapturePSO)));
+
+    D3D12_INPUT_ELEMENT_DESC cachedLayout[] =
+    {
+        {"POSITION", 1, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,
+            D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+        {"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12,
+            D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+        {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24,
+            D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}
+    };
+
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC cachedDesc = psoDesc;
+    cachedDesc.InputLayout = {cachedLayout, _countof(cachedLayout)};
+    cachedDesc.VS =
+    {
+        reinterpret_cast<BYTE*>(mCachedVsByteCode->GetBufferPointer()),
+        mCachedVsByteCode->GetBufferSize()
+    };
+    cachedDesc.HS = {};
+    cachedDesc.DS = {};
+    cachedDesc.GS = {};
+    cachedDesc.StreamOutput = {};
+    cachedDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    cachedDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
+
+    ThrowIfFailed(
+        md3dDevice->CreateGraphicsPipelineState(
+            &cachedDesc,
+            IID_PPV_ARGS(&mCachedPSO)));
+}
+
+void BoxApp::ResizeCachedMaterial(CachedMaterial& item, UINT64 bytes)
+{
+    // IA vertex buffer views use UINT for SizeInBytes.
+    const UINT64 largestBuffer =
+        static_cast<UINT64>(UINT_MAX) & ~UINT64(31);
+
+    bytes = (std::max)(bytes, UINT64(32 * 1024));
+    bytes = (bytes + 31) & ~UINT64(31);
+
+    if (bytes > largestBuffer)
+    {
+        throw std::runtime_error(
+            "The tessellated mesh exceeds the vertex-buffer limit. "
+            "Reduce the maximum tessellation factor (TessParams.w).");
+    }
+
+    const auto heap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+    const auto desc = CD3DX12_RESOURCE_DESC::Buffer(bytes);
+
+    // Called during initialization or after FlushCommandQueue().
+    // The old cache is no longer in use by the GPU.
+    item.VertexBuffer.Reset();
+    ComPtr<ID3D12Resource> newBuffer;
+    ThrowIfFailed(
+        md3dDevice->CreateCommittedResource(
+            &heap,
+            D3D12_HEAP_FLAG_NONE,
+            &desc,
+            D3D12_RESOURCE_STATE_STREAM_OUT,
+            nullptr,
+            IID_PPV_ARGS(&newBuffer)));
+
+    item.VertexBuffer = std::move(newBuffer);
+    item.CapacityBytes = bytes;
+    item.VertexCount = 0;
+    item.IsVertexBufferState = false;
+}
+
+void BoxApp::InitializeCacheResources()
+{
+    if (mDrawItems.empty())
+    {
+        throw std::runtime_error("Sponza has no drawable material groups.");
+    }
+
+    mCachedMaterials.resize(mDrawItems.size());
+
+    const auto defaultHeap =
+        CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+    const auto uploadHeap =
+        CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+    const auto readbackHeap =
+        CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_READBACK);
+
+    const auto counterDesc = CD3DX12_RESOURCE_DESC::Buffer(8);
+    ThrowIfFailed(
+        md3dDevice->CreateCommittedResource(
+            &uploadHeap,
+            D3D12_HEAP_FLAG_NONE,
+            &counterDesc,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr,
+            IID_PPV_ARGS(&mZeroFilledSizeUpload)));
+
+    void* zeroData = nullptr;
+    const D3D12_RANGE noCpuRead = {0, 0};
+    ThrowIfFailed(
+        mZeroFilledSizeUpload->Map(0, &noCpuRead, &zeroData));
+    std::memset(zeroData, 0, 8);
+    mZeroFilledSizeUpload->Unmap(0, nullptr);
+
+    for (size_t i = 0; i < mDrawItems.size(); ++i)
+    {
+        CachedMaterial& item = mCachedMaterials[i];
+        ThrowIfFailed(
+            md3dDevice->CreateCommittedResource(
+                &defaultHeap,
+                D3D12_HEAP_FLAG_NONE,
+                &counterDesc,
+                D3D12_RESOURCE_STATE_COPY_DEST,
+                nullptr,
+                IID_PPV_ARGS(&item.FilledSize)));
+
+        // An initial guess: 4 times the vertices of the original mesh.
+        // Overflow is detected by SO statistics and triggers a resize.
+        UINT64 initialBytes =
+            UINT64(mDrawItems[i].IndexCount) * sizeof(Vertex) * 4;
+        ResizeCachedMaterial(item, initialBytes);
+    }
+
+    D3D12_QUERY_HEAP_DESC queryDesc = {};
+    queryDesc.Type = D3D12_QUERY_HEAP_TYPE_SO_STATISTICS;
+    queryDesc.Count = static_cast<UINT>(mDrawItems.size());
+    ThrowIfFailed(
+        md3dDevice->CreateQueryHeap(
+            &queryDesc,
+            IID_PPV_ARGS(&mStreamOutputQueries)));
+
+    const auto resultDesc = CD3DX12_RESOURCE_DESC::Buffer(
+        sizeof(D3D12_QUERY_DATA_SO_STATISTICS) * mDrawItems.size());
+    ThrowIfFailed(
+        md3dDevice->CreateCommittedResource(
+            &readbackHeap,
+            D3D12_HEAP_FLAG_NONE,
+            &resultDesc,
+            D3D12_RESOURCE_STATE_COPY_DEST,
+            nullptr,
+            IID_PPV_ARGS(&mQueryReadback)));
+}
+
+void BoxApp::RebuildCachedMesh()
+{
+    mCacheReady = false;
+
+    // Stream Output writes a triangle list; the statistics report its size.
+    for (int attempt = 0; attempt < 4; ++attempt)
+    {
+        ThrowIfFailed(mDirectCmdListAlloc->Reset());
+        ThrowIfFailed(
+            mCommandList->Reset(mDirectCmdListAlloc.Get(), mCapturePSO.Get()));
+
+        ID3D12DescriptorHeap* heaps[] = {mCbvHeap.Get()};
+        mCommandList->SetDescriptorHeaps(1, heaps);
+        mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
+        mCommandList->IASetPrimitiveTopology(
+            D3D_PRIMITIVE_TOPOLOGY_3_CONTROL_POINT_PATCHLIST);
+
+        auto vbv = mBoxGeo->VertexBufferView();
+        auto ibv = mBoxGeo->IndexBufferView();
+        mCommandList->IASetVertexBuffers(0, 1, &vbv);
+        mCommandList->IASetIndexBuffer(&ibv);
+
+        CD3DX12_GPU_DESCRIPTOR_HANDLE cbvHandle(
+            mCbvHeap->GetGPUDescriptorHandleForHeapStart());
+        mCommandList->SetGraphicsRootDescriptorTable(0, cbvHandle);
+
+        for (size_t i = 0; i < mDrawItems.size(); ++i)
+        {
+            CachedMaterial& cached = mCachedMaterials[i];
+            const MaterialDraw& drawItem = mDrawItems[i];
+
+            if (cached.IsVertexBufferState)
+            {
+                auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+                    cached.VertexBuffer.Get(),
+                    D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+                    D3D12_RESOURCE_STATE_STREAM_OUT);
+                mCommandList->ResourceBarrier(1, &barrier);
+            }
+
+            if (mFilledSizesAreStreamOut)
+            {
+                auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+                    cached.FilledSize.Get(),
+                    D3D12_RESOURCE_STATE_STREAM_OUT,
+                    D3D12_RESOURCE_STATE_COPY_DEST);
+                mCommandList->ResourceBarrier(1, &barrier);
+            }
+
+            mCommandList->CopyBufferRegion(
+                cached.FilledSize.Get(), 0,
+                mZeroFilledSizeUpload.Get(), 0, 8);
+
+            auto filledSizeBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
+                cached.FilledSize.Get(),
+                D3D12_RESOURCE_STATE_COPY_DEST,
+                D3D12_RESOURCE_STATE_STREAM_OUT);
+            mCommandList->ResourceBarrier(1, &filledSizeBarrier);
+
+            D3D12_STREAM_OUTPUT_BUFFER_VIEW soView = {};
+            soView.BufferLocation =
+                cached.VertexBuffer->GetGPUVirtualAddress();
+            soView.SizeInBytes = cached.CapacityBytes;
+            soView.BufferFilledSizeLocation =
+                cached.FilledSize->GetGPUVirtualAddress();
+            mCommandList->SOSetTargets(0, 1, &soView);
+
+            CD3DX12_GPU_DESCRIPTOR_HANDLE srvHandle(
+                mCbvHeap->GetGPUDescriptorHandleForHeapStart());
+            srvHandle.Offset(
+                1 + drawItem.MaterialIndex * 3,
+                mCbvSrvUavDescriptorSize);
+            mCommandList->SetGraphicsRootDescriptorTable(1, srvHandle);
+
+            mCommandList->BeginQuery(
+                mStreamOutputQueries.Get(),
+                D3D12_QUERY_TYPE_SO_STATISTICS_STREAM0,
+                static_cast<UINT>(i));
+
+            mCommandList->DrawIndexedInstanced(
+                drawItem.IndexCount, 1,
+                drawItem.StartIndexLocation,
+                drawItem.BaseVertexLocation, 0);
+
+            mCommandList->EndQuery(
+                mStreamOutputQueries.Get(),
+                D3D12_QUERY_TYPE_SO_STATISTICS_STREAM0,
+                static_cast<UINT>(i));
+
+            // Clear slot 0 explicitly before using this resource as a VB.
+            const D3D12_STREAM_OUTPUT_BUFFER_VIEW emptySoView = {};
+            mCommandList->SOSetTargets(0, 1, &emptySoView);
+
+            auto vertexBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
+                cached.VertexBuffer.Get(),
+                D3D12_RESOURCE_STATE_STREAM_OUT,
+                D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+            mCommandList->ResourceBarrier(1, &vertexBarrier);
+            cached.IsVertexBufferState = true;
+        }
+
+        mFilledSizesAreStreamOut = true;
+
+        mCommandList->ResolveQueryData(
+            mStreamOutputQueries.Get(),
+            D3D12_QUERY_TYPE_SO_STATISTICS_STREAM0,
+            0, static_cast<UINT>(mDrawItems.size()),
+            mQueryReadback.Get(), 0);
+
+        ThrowIfFailed(mCommandList->Close());
+        ID3D12CommandList* lists[] = {mCommandList.Get()};
+        mCommandQueue->ExecuteCommandLists(1, lists);
+        FlushCommandQueue();
+
+        const SIZE_T queryBytes =
+            sizeof(D3D12_QUERY_DATA_SO_STATISTICS) * mDrawItems.size();
+        const D3D12_RANGE readRange = {0, queryBytes};
+        D3D12_QUERY_DATA_SO_STATISTICS* data = nullptr;
+        ThrowIfFailed(
+            mQueryReadback->Map(
+                0, &readRange, reinterpret_cast<void**>(&data)));
+        std::vector<D3D12_QUERY_DATA_SO_STATISTICS> results(
+            data, data + mDrawItems.size());
+        const D3D12_RANGE noCpuWrite = {0, 0};
+        mQueryReadback->Unmap(0, &noCpuWrite);
+
+        bool overflow = false;
+        for (size_t i = 0; i < results.size(); ++i)
+        {
+            const auto& result = results[i];
+            CachedMaterial& cached = mCachedMaterials[i];
+
+            if (result.PrimitivesStorageNeeded > result.NumPrimitivesWritten)
+            {
+                overflow = true;
+                const UINT64 needed =
+                    result.PrimitivesStorageNeeded * 3 * sizeof(Vertex);
+                ResizeCachedMaterial(
+                    cached,
+                    (std::max)(cached.CapacityBytes * 2,
+                        needed + needed / 4));
+            }
+            else
+            {
+                const UINT64 vertices = result.NumPrimitivesWritten * 3;
+                if (vertices > UINT_MAX ||
+                    vertices * sizeof(Vertex) > cached.CapacityBytes)
+                {
+                    throw std::runtime_error(
+                        "Invalid Stream Output vertex count.");
+                }
+                cached.VertexCount = static_cast<UINT>(vertices);
+            }
+        }
+
+        if (!overflow)
+        {
+            mCacheReady = true;
+            UINT64 triangleCount = 0;
+            UINT64 cacheBytes = 0;
+            for (const auto& result : results)
+            {
+                triangleCount += result.NumPrimitivesWritten;
+            }
+            for (const auto& cached : mCachedMaterials)
+            {
+                cacheBytes += cached.CapacityBytes;
+            }
+            const std::string log =
+                "Tessellation rebuilt on frame " +
+                std::to_string(mFrameIndex) +
+                "; cached triangles: " +
+                std::to_string(triangleCount) +
+                "; allocated cache: " +
+                std::to_string(cacheBytes / (1024 * 1024)) + " MiB\n";
+            OutputDebugStringA(log.c_str());
+
+            mMainWndCaption = L"Sponza | tess every " +
+                std::to_wstring(TessellationFrameInterval) +
+                L" frames | last: " + std::to_wstring(mFrameIndex) +
+                L" | triangles: " + std::to_wstring(triangleCount);
+            SetWindowTextW(mhMainWnd, mMainWndCaption.c_str());
+            return;
+        }
+    }
+
+    throw std::runtime_error(
+        "Stream Output still overflows after resizing the cache.");
 }

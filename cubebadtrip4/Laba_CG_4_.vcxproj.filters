@@ -73,4 +73,10 @@
       <Filter>Файлы ресурсов\Shaders</Filter>
     </None>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Shaders\tessellation.hlsl">
+      <Filter>Файлы ресурсов\Shaders</Filter>
+    </None>
+    <None Include="CHANGES_50_FRAMES.md" />
+  </ItemGroup>
 </Project>
