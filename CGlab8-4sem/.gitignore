@@ -1,0 +1,9 @@
+.vs/
+build/
+out/
+*.exe
+*.pdb
+*.ilk
+*.obj
+*.log
+README.md
